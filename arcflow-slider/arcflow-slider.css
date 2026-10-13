@@ -1,0 +1,115 @@
+/* Wrapper: its height = how long the slider stays pinned while you scroll */
+.af-pin { position: relative; height: 260vh; }
+
+#arcflow-k7q2 {
+  /* card width: limited by BOTH screen width and screen height */
+  --af-w: clamp(130px, min(19vw, 30vh), 300px);
+  --af-radius: 14px;
+  position: sticky;              /* FIXED on screen while the wrapper scrolls past */
+  top: 0;
+  width: 100%;
+  height: 100vh;                 /* fallback */
+  height: 100svh;                /* = exactly the display height */
+  min-height: 460px;
+  background: #000;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: pan-y;
+  box-sizing: border-box;
+}
+#arcflow-k7q2 *, #arcflow-k7q2 *::before, #arcflow-k7q2 *::after { box-sizing: border-box; }
+
+/* ---------- blurred background (centre card image) ---------- */
+#arcflow-k7q2 .af-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+#arcflow-k7q2 .af-bg-layer {
+  position: absolute;
+  inset: -10%;                   /* bigger than the box so blur edges are hidden */
+  background-size: cover;        /* image always fills the full height + width */
+  background-position: center;
+  filter: blur(38px) saturate(1.25) brightness(.7);
+  transform: scale(1.1);
+  opacity: 0;
+  transition: opacity .8s ease;
+}
+#arcflow-k7q2 .af-bg-layer.is-on { opacity: 1; }
+#arcflow-k7q2 .af-bg-shade {     /* dark edges so cards pop */
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 50% 50%, transparent 35%, rgba(0,0,0,.55) 100%);
+}
+
+/* ---------- cards ---------- */
+#arcflow-k7q2 .af-track {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+#arcflow-k7q2 .af-card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--af-w);
+  margin-left: calc(var(--af-w) / -2);
+  margin-top: calc(var(--af-w) * -1);       /* centres the card vertically (+ small lift for the arc) */
+  aspect-ratio: 0.58 / 1;
+  cursor: pointer;
+  outline: none;
+  will-change: transform, opacity;
+  transform-origin: 50% 50%;
+}
+
+#arcflow-k7q2 .af-face {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--af-radius);
+  overflow: hidden;
+  background: #222;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, .55);
+  transition: transform .35s cubic-bezier(.2, .8, .2, 1), box-shadow .35s;
+}
+#arcflow-k7q2 .af-face img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+}
+#arcflow-k7q2 .af-face::after {
+  content: "";
+  position: absolute; inset: 55% 0 0 0;
+  background: linear-gradient(to top, rgba(0,0,0,.65), transparent);
+  pointer-events: none;
+}
+#arcflow-k7q2 .af-cap {
+  position: absolute;
+  left: 14px; bottom: 12px; right: 14px;
+  z-index: 1;
+  font: 600 clamp(12px, 1.1vw, 15px)/1.2 system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: #fff;
+  letter-spacing: .01em;
+}
+
+#arcflow-k7q2 .af-card.is-active .af-face {
+  transform: scale(1.07);
+  box-shadow: 0 26px 60px rgba(0, 0, 0, .7), 0 0 0 2px rgba(255,255,255,.85);
+}
+#arcflow-k7q2 .af-card:focus-visible .af-face {
+  box-shadow: 0 0 0 3px #7aa2ff;
+}
+
+@media (max-width: 600px) {
+  #arcflow-k7q2 { --af-w: min(46vw, 30svh); --af-radius: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #arcflow-k7q2 .af-bg-layer { transition: none; }
+}
