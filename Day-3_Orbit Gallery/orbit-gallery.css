@@ -1,9 +1,10 @@
-/* Every rule is scoped under #img-focus (classes are prefixed "if-"),
+/* Orbit Gallery - styles */
+/* Every rule is scoped under #orbit-gallery (classes are prefixed "og-"),
    so nothing here can leak into, or be broken by, other CSS on the page. */
 
 html, body { margin: 0; background: #0a0a0a; }
 
-#img-focus {
+#orbit-gallery {
   position: relative;
   width: 100%;
   height: 100vh;
@@ -17,14 +18,14 @@ html, body { margin: 0; background: #0a0a0a; }
   -webkit-user-select: none;
   cursor: grab;
 }
-#img-focus.is-dragging { cursor: grabbing; }
+#orbit-gallery.is-dragging { cursor: grabbing; }
 
-#img-focus *,
-#img-focus *::before,
-#img-focus *::after { box-sizing: border-box; }
+#orbit-gallery *,
+#orbit-gallery *::before,
+#orbit-gallery *::after { box-sizing: border-box; }
 
 /* ---------- text ---------- */
-#img-focus .if-title {
+#orbit-gallery .og-title {
   position: absolute;
   top: 9%;
   left: 0;
@@ -40,7 +41,7 @@ html, body { margin: 0; background: #0a0a0a; }
   pointer-events: none;
 }
 
-#img-focus .if-sub {
+#orbit-gallery .og-sub {
   position: absolute;
   bottom: 8%;
   left: 50%;
@@ -58,7 +59,7 @@ html, body { margin: 0; background: #0a0a0a; }
 /* ---------- 3D stage ---------- */
 /* A zero-height line through the middle of the cards.
    JS sets its `perspective`, and each card's size and transform. */
-#img-focus .if-stage {
+#orbit-gallery .og-stage {
   position: absolute;
   left: 0;
   right: 0;
@@ -67,7 +68,7 @@ html, body { margin: 0; background: #0a0a0a; }
   perspective-origin: 50% 0;
 }
 
-#img-focus .if-card {
+#orbit-gallery .og-card {
   position: absolute;
   left: 50%;
   top: 0;
@@ -81,6 +82,6 @@ html, body { margin: 0; background: #0a0a0a; }
 }
 
 @media (max-width: 600px) {
-  #img-focus .if-card { border-radius: 10px; }
-  #img-focus .if-title { top: 7%; }
+  #orbit-gallery .og-card { border-radius: 10px; }
+  #orbit-gallery .og-title { top: 7%; }
 }

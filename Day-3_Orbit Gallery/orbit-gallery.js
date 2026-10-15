@@ -1,9 +1,10 @@
+// Orbit Gallery - 3D ring image carousel
 // Wrapped in an IIFE: no global variables, and every DOM lookup is
-// scoped to #img-focus, so it can't conflict with other scripts.
+// scoped to #orbit-gallery, so it can't conflict with other scripts.
 (function () {
-  const root = document.getElementById("img-focus");
+  const root = document.getElementById("orbit-gallery");
   if (!root) return;
-  const stage = root.querySelector(".if-stage");
+  const stage = root.querySelector(".og-stage");
 
   /* ============ 1. YOUR IMAGES ============
      Use  src: "./images/photo.jpg"  for real images.
@@ -34,7 +35,7 @@
   for (let i = 0; i < count; i++) {
     const s = slides[i % slides.length];
     const el = document.createElement("div");
-    el.className = "if-card";
+    el.className = "og-card";
     el.setAttribute("role", "img");
     if (s.alt) el.setAttribute("aria-label", s.alt);
     if (s.src) el.style.backgroundImage = "url(" + s.src + ")";
@@ -129,7 +130,7 @@
     raf = requestAnimationFrame(tick);
   }
 
-  /* ============ 6. INPUT (listeners only on #img-focus) ============ */
+  /* ============ 6. INPUT (listeners only on #orbit-gallery) ============ */
   // drag
   let lastX = 0, lastT = 0;
 
