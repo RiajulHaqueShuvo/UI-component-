@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lumora Reel – slider section</title>
+<style>
+  /* ── demo page only (তোমার সাইটে এই অংশ লাগবে না) ── */
+  html,body{margin:0;background:#0d0d0e;font-family:"Helvetica Neue",Arial,sans-serif}
+  .demo-strip{height:22vh;display:grid;place-items:center;color:#777;font-size:14px;letter-spacing:.08em;text-transform:uppercase}
+
+  /* ═════════════ LUMORA REEL — CSS START ═════════════ */
+  .lmr{
+    --s:1;
+    position:relative; width:100%;
+    height:clamp(480px,43.4vw,780px);
+    overflow:hidden; background:#1a1413; color:#fff;
+    font-family:"Inter","Helvetica Neue",Arial,sans-serif;
+    cursor:grab; outline:none;
+    user-select:none; -webkit-user-select:none;
+    touch-action:pan-y;
+  }
+  .lmr *{box-sizing:border-box}
+  .lmr.is-drag{cursor:grabbing}
+
+  /* blurred background (crossfades when the active slide changes) */
+  .lmr-bg{position:absolute;inset:0;overflow:hidden}
+  .lmr-bg i{
+    position:absolute; inset:-14%;
+    background-size:cover; background-position:center;
+    filter:blur(52px) saturate(1.25);
+    opacity:0; transition:opacity .9s ease;
+  }
+  .lmr-bg i.on{opacity:1}
+  .lmr-bg::after{
+    content:""; position:absolute; inset:0;
+    background:linear-gradient(180deg,rgba(0,0,0,.10),rgba(0,0,0,.30));
+  }
+
+  .lmr-track{position:absolute;inset:0}
+  .lmr-item{position:absolute;left:0;top:0;height:100%;will-change:transform;cursor:pointer}
+  .lmr-num{
+    position:absolute; left:0; top:calc(10px*var(--s));
+    font-size:max(11px,calc(15px*var(--s)));
+    letter-spacing:.04em; font-variant-numeric:tabular-nums;
+  }
+  .lmr-card{
+    position:absolute; left:0; right:0; top:calc(37px*var(--s));
+    overflow:hidden; background:#222;
+  }
+  .lmr-card img{
+    width:100%; height:100%; object-fit:cover; display:block;
+    pointer-events:none; -webkit-user-drag:none;
+  }
+  .lmr-cap{position:absolute;left:0;right:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lmr-t{display:block;font-size:max(12px,calc(15px*var(--s)));font-weight:500;letter-spacing:.01em}
+  .lmr-s{display:block;margin-top:calc(6px*var(--s));font-size:max(10.5px,calc(12.5px*var(--s)));opacity:0;
+         text-overflow:ellipsis;overflow:hidden}
+
+  @media (prefers-reduced-motion:reduce){ .lmr-bg i{transition-duration:.01s} }
+  /* ═════════════ LUMORA REEL — CSS END ═════════════ */
+</style>
+</head>
+<body>
+
+<div class="demo-strip">↓ your content above ↓</div>
+
+<!-- ═════════════ LUMORA REEL — HTML START ═════════════ -->
+<section class="lmr" id="lumora-reel" tabindex="0" aria-roledescription="carousel" aria-label="Lumora Reel gallery">
+  <div class="lmr-bg"><i></i><i></i></div>
+  <div class="lmr-track"></div>
+</section>
+<!-- ═════════════ LUMORA REEL — HTML END ═════════════ -->
+
+<div class="demo-strip">↑ your content below ↑</div>
+
+<script>
+/* ═════════════ LUMORA REEL — JS START ═════════════ */
+(function () {
+  /* ───────── ১) ছবি + লেখা সেটিং ─────────
+     file  : ছবির ফাইলের নাম (এক্সটেনশন ছাড়া) — jpg/png নিজে খুঁজে নেবে
+     title : কার্ডের নিচের নাম
+     text  : একটিভ কার্ডের নিচের ছোট লাইন */
+  const CONFIG = {
+    folder: "assets/",                      // ছবির ফোল্ডার (HTML ফাইলের তুলনায়) — দরকারমতো বদলাও, যেমন "images/"
+    exts: ["jpg", "png", "jpeg", "webp"],   // jpg/png মিশে থাকলেও নিজে খুঁজে নেবে
+    autoplay: 0                             // 0 = বন্ধ, 4000 = প্রতি ৪ সেকেন্ডে অটো স্লাইড
+  };
+
+  const SAREE = "Saree · New Collection";
+  const PARTY = "Party Wear · Lehenga";
+  const SLIDES = [
+    { file: "new_saree collection 1", title: "Lilac Mist",       text: SAREE + " — soft lilac drape with embellished sleeves" },
+    { file: "new_saree collection 2", title: "Crimson Bloom",    text: SAREE + " — rich crimson with golden floral touches" },
+    { file: "new_saree collection 3", title: "Ivory Blue Petals",text: SAREE + " — ivory drape with delicate blue florals" },
+    { file: "new_saree collection 4", title: "Blush Garden",     text: SAREE + " — airy white with blush floral prints" },
+    { file: "new_saree collection 5", title: "Pink Petal",       text: SAREE + " — sweet pink scattered with white blooms" },
+    { file: "new_saree collection 6", title: "Sage Whisper",     text: SAREE + " — calm sage green with soft floral work" },
+    { file: "new_saree collection 7", title: "Violet Haze",      text: SAREE + " — dreamy violet with a graceful fall" },
+    { file: "new_saree collection 8", title: "Maroon Royale",    text: SAREE + " — deep maroon with a classic golden border" },
+    { file: "Party dress 1",          title: "Sky Shimmer",      text: PARTY + " — powder blue with a shimmering flare" },
+    { file: "Party dress 2",          title: "Garnet Zari",      text: PARTY + " — garnet red with heavy zari embroidery" },
+    { file: "Party dress 3",          title: "Dusty Rose",       text: PARTY + " — mellow mauve for an elegant evening" },
+    { file: "Party dress 4",          title: "Royal Plum",       text: PARTY + " — deep plum with a gold-edged dupatta" },
+    { file: "Party dress 5",          title: "Ruby Bride",       text: PARTY + " — ruby red bridal-style lehenga" },
+    { file: "Party dress 6",          title: "Ivory Gold",       text: PARTY + " — ivory with a rich golden border" },
+    { file: "Party dress 8",          title: "Silver Dusk",      text: PARTY + " — silver-grey ombre with sparkling detail" },
+    { file: "Party dress 9",          title: "Wine Velvet",      text: PARTY + " — wine-burgundy with a regal look" }
+  ];
+  /* ───────── সেটিং শেষ ───────── */
+
+  const root = document.getElementById("lumora-reel");
+  if (!root) return;
+  const track = root.querySelector(".lmr-track");
+  const bgs = root.querySelectorAll(".lmr-bg i");
+  const N = SLIDES.length;
+  const M = N * Math.ceil(14 / N);              // total DOM cards (loop window)
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const EASE = reduce ? 1 : 0.085;              // smaller = slower, floatier
+
+  const mod = (a, n) => ((a % n) + n) % n;
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const pad = n => String(n).padStart(3, "0");
+
+  /* build cards */
+  const items = [];
+  for (let j = 0; j < M; j++) {
+    const s = SLIDES[j % N];
+    const el = document.createElement("div");
+    el.className = "lmr-item";
+    el.innerHTML =
+      `<span class="lmr-num">${pad((j % N) + 1)}</span>` +
+      `<div class="lmr-card"><img alt="${s.title}" draggable="false"></div>` +
+      `<div class="lmr-cap"><span class="lmr-t">${s.title}</span><span class="lmr-s">${s.text}</span></div>`;
+    track.appendChild(el);
+    items.push({
+      j, el, d: 0,
+      num: el.querySelector(".lmr-num"),
+      card: el.querySelector(".lmr-card"),
+      img: el.querySelector("img"),
+      cap: el.querySelector(".lmr-cap"),
+      sub: el.querySelector(".lmr-s"),
+      ttl: el.querySelector(".lmr-t")
+    });
+  }
+
+  /* measurements (scaled from the original 1568×680 design) */
+  let W, H, S, bw, bh, Bw, Bh, gap, anchor, pitch, cardTop;
+  function measure() {
+    W = root.clientWidth; H = root.clientHeight;
+    S = Math.min(H / 680, W / 620);
+    bw = 207 * S; bh = 393 * S;                 // small card
+    Bw = 442 * S; Bh = 584 * S;                 // active card
+    gap = 7 * S; cardTop = 37 * S; pitch = bw + gap;
+    anchor = W < 700 ? W * 0.05 : W * 0.36;     // where the active card sits
+    root.style.setProperty("--s", S.toFixed(3));
+    render();
+  }
+
+  let pos = 0, target = 0, raf = 0, curBg = -1, flip = 0;
+
+  function render() {
+    for (const it of items) it.d = mod(it.j - pos + M / 2, M) - M / 2;
+    const sorted = items.slice().sort((a, b) => a.d - b.d);
+
+    let x = 0, ia = 0;
+    sorted.forEach((it, k) => {
+      const u = clamp(1 - Math.abs(it.d), 0, 1);
+      it.w = u * u * (3 - 2 * u);               // 0 = small, 1 = fully active
+      it.cw = bw + (Bw - bw) * it.w;
+      it.L = x; x += it.cw + gap;
+      if (it.d <= 0) ia = k;
+    });
+    const a = sorted[ia], n = sorted[ia + 1] || a;
+    const ref = a.L + (-a.d) * (n.L - a.L);     // keeps the active card pinned at `anchor`
+
+    for (const it of sorted) {
+      const px = anchor + it.L - ref;
+      const ch = bh + (Bh - bh) * it.w;
+      const off = px + it.cw < -30 || px > W + 30;
+      it.el.style.visibility = off ? "hidden" : "visible";
+      if (off) continue;
+      it.el.style.width = it.cw + "px";
+      it.el.style.transform = `translate3d(${px}px,0,0)`;
+      it.card.style.height = ch + "px";
+      it.cap.style.top = (cardTop + ch + 13 * S) + "px";
+      it.num.style.opacity = (0.55 + 0.45 * it.w).toFixed(3);
+      it.ttl.style.opacity = (0.72 + 0.28 * it.w).toFixed(3);
+      it.sub.style.opacity = (it.w * it.w).toFixed(3);
+    }
+  }
+
+  function paintBg() {
+    const s = SLIDES[curBg];
+    if (!s || !s.src) return;
+    bgs[flip].style.backgroundImage = `url("${s.src}")`;
+    bgs[flip].classList.add("on");
+    bgs[flip ^ 1].classList.remove("on");
+  }
+  function updateBg() {
+    const idx = mod(Math.round(target), N);
+    if (idx === curBg) return;
+    curBg = idx;
+    flip ^= 1;
+    paintBg();
+  }
+
+  /* ছবি লোড: jpg না পেলে png, তারপর বাকিগুলো চেষ্টা করে */
+  function loadSlide(i, k) {
+    const s = SLIDES[i];
+    const hasExt = /\.(jpe?g|png|webp|avif|gif)$/i.test(s.file);
+    const list = hasExt ? [""] : CONFIG.exts.map(e => "." + e);
+    if (k >= list.length) { console.warn("Lumora Reel: image not found →", CONFIG.folder + s.file); return; }
+    const url = CONFIG.folder + encodeURI(s.file) + list[k];
+    const im = new Image();
+    im.onload = () => {
+      s.src = url;
+      items.forEach(it => { if (it.j % N === i) it.img.src = url; });
+      if (curBg === i) paintBg();
+    };
+    im.onerror = () => loadSlide(i, k + 1);
+    im.src = url;
+  }
+
+  function frame() {
+    const diff = target - pos;
+    if (Math.abs(diff) < 0.0008) { pos = target; render(); raf = 0; return; }
+    pos += diff * EASE;
+    render();
+    raf = requestAnimationFrame(frame);
+  }
+  function setTarget(t) { target = t; updateBg(); if (!raf) raf = requestAnimationFrame(frame); }
+  function go(dir) { setTarget(Math.round(target) + dir); }
+
+  /* click a card → bring it to the active spot */
+  let suppressClick = false;
+  items.forEach(it => it.el.addEventListener("click", () => {
+    if (suppressClick) return;
+    setTarget(Math.round(pos + it.d));
+  }));
+
+  /* drag / swipe */
+  let down = false, moved = false, sx = 0, spos = 0, lastPos = 0, lastT = 0, vel = 0;
+  root.addEventListener("pointerdown", e => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    down = true; moved = false; sx = e.clientX; spos = pos; lastPos = pos; lastT = performance.now(); vel = 0;
+    if (raf) { cancelAnimationFrame(raf); raf = 0; }
+    target = pos;
+  });
+  root.addEventListener("pointermove", e => {
+    if (!down) return;
+    const dx = e.clientX - sx;
+    if (!moved && Math.abs(dx) > 6) {
+      moved = true; root.classList.add("is-drag");
+      try { root.setPointerCapture(e.pointerId); } catch (_) {}
+    }
+    if (!moved) return;
+    pos = spos - dx / pitch; target = pos;
+    const now = performance.now(), dt = now - lastT;
+    if (dt > 0) { vel = 0.8 * vel + 0.2 * ((pos - lastPos) / dt); lastPos = pos; lastT = now; }
+    render();
+  });
+  function endDrag() {
+    if (!down) return;
+    down = false; root.classList.remove("is-drag");
+    if (moved) {
+      suppressClick = true; setTimeout(() => (suppressClick = false), 0);
+      setTarget(Math.round(pos + clamp(vel * 220, -3, 3)));
+    }
+  }
+  root.addEventListener("pointerup", endDrag);
+  root.addEventListener("pointercancel", endDrag);
+
+  /* trackpad horizontal scroll */
+  let lastWheel = 0;
+  root.addEventListener("wheel", e => {
+    if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;   // vertical scroll = normal page scroll
+    e.preventDefault();
+    const n = performance.now();
+    if (n - lastWheel < 450) return;
+    lastWheel = n; go(e.deltaX > 0 ? 1 : -1);
+  }, { passive: false });
+
+  /* keyboard */
+  root.addEventListener("keydown", e => {
+    if (e.key === "ArrowRight") { e.preventDefault(); go(1); }
+    if (e.key === "ArrowLeft")  { e.preventDefault(); go(-1); }
+  });
+
+  /* optional autoplay */
+  if (CONFIG.autoplay > 0 && !reduce) {
+    let hover = false;
+    root.addEventListener("mouseenter", () => (hover = true));
+    root.addEventListener("mouseleave", () => (hover = false));
+    setInterval(() => { if (!hover && !down && !document.hidden) go(1); }, CONFIG.autoplay);
+  }
+
+  /* init */
+  if ("ResizeObserver" in window) new ResizeObserver(measure).observe(root);
+  window.addEventListener("resize", measure);
+  measure();
+  updateBg();
+  SLIDES.forEach((_, i) => loadSlide(i, 0));
+})();
+/* ═════════════ LUMORA REEL — JS END ═════════════ */
+</script>
+</body>
+</html>
