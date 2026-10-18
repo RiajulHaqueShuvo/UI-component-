@@ -1,0 +1,145 @@
+/* Every rule is scoped under #zoom-slider (classes are prefixed "zs-")
+   so nothing here can leak into, or be broken by, other CSS on the page. */
+
+#zoom-slider {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  outline: none;
+  touch-action: none;          /* we handle swipe ourselves */
+  overscroll-behavior: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#zoom-slider *,
+#zoom-slider *::before,
+#zoom-slider *::after {
+  box-sizing: border-box;
+}
+
+/* ---------- heading ---------- */
+#zoom-slider .zs-head {
+  position: absolute;
+  top: 3.2rem;
+  left: 0;
+  right: 0;
+  text-align: center;
+  z-index: 10;
+  pointer-events: none;
+}
+
+#zoom-slider .zs-title {
+  margin: 0;
+  font-size: clamp(1.8rem, 3vw, 2.6rem);
+  font-weight: 300;
+  letter-spacing: 0.01em;
+}
+
+#zoom-slider .zs-hint {
+  margin: 0.9rem 0 0;
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* ---------- blurred background (copy of the middle card) ---------- */
+#zoom-slider {
+  --zs-blur: 60px;      /* how blurry the background is */
+  --zs-dim: 0.55;       /* 1 = original brightness, 0 = black */
+}
+
+#zoom-slider .zs-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: #000;
+}
+
+#zoom-slider .zs-bg-layer {
+  position: absolute;
+  inset: -12%;          /* extra size so blurred edges never show */
+  background-size: cover;
+  background-position: center;
+  filter: blur(var(--zs-blur)) brightness(var(--zs-dim)) saturate(1.25);
+  opacity: 0;
+  will-change: opacity;
+}
+
+/* ---------- track + items ---------- */
+#zoom-slider .zs-track {
+  position: absolute;
+  inset: 0;
+  z-index: 1;           /* above the background */
+}
+
+/* JS sets width / height / transform every frame */
+#zoom-slider .zs-item {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  cursor: pointer;
+  will-change: transform, width, height;
+}
+
+#zoom-slider .zs-media {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #111;
+}
+
+#zoom-slider .zs-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
+
+/* ---------- caption (sits above the item, fades in when active) ---------- */
+#zoom-slider .zs-caption {
+  position: absolute;
+  left: 0;
+  bottom: 100%;
+  padding-bottom: 1.1rem;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+}
+
+#zoom-slider .zs-num {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+#zoom-slider .zs-name {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 1.05rem;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+#zoom-slider .zs-sub {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+@media (max-width: 600px) {
+  #zoom-slider .zs-head { top: 2rem; }
+  #zoom-slider .zs-name { font-size: 0.9rem; }
+}

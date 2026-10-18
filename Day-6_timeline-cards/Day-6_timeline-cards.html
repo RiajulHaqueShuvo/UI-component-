@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Timeline Cards</title>
+<style>
+  html, body { margin: 0; background: #f6f3ec; }
+
+  /* everything is scoped to #tl (classes prefixed "tl-") so it can be pasted into any page */
+  #tl {
+    --bg: #f6f3ec; --card: #fffcf5; --maroon: #6a2c47; --ink: #3b2f35; --mute: #877c7b; --top: 470px;
+    box-sizing: border-box; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    padding: 40px clamp(16px, 5vw, 64px); background: var(--bg); color: var(--ink);
+    font-family: Inter, "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+  }
+  #tl *, #tl *::before, #tl *::after { box-sizing: border-box; }
+  #tl .tl-wrap { position: relative; width: 100%; max-width: 1160px; padding-top: var(--top); }
+
+  /* ---------- card ---------- */
+  #tl .tl-card {
+    position: absolute; left: 0; bottom: calc(100% - var(--top)); top: auto;
+    width: min(360px, 100%); padding: 7px; border-radius: 24px;
+    background: var(--card); border: 1px solid rgba(106, 44, 71, .09);
+    box-shadow: 0 28px 44px -20px rgba(70, 40, 40, .3), 0 2px 8px rgba(70, 40, 40, .06);
+    will-change: transform;
+  }
+  #tl .tl-body { transition: opacity .32s ease, transform .42s cubic-bezier(.2, .8, .2, 1); }
+  #tl .tl-body.out { opacity: 0; transform: translateY(8px); transition-duration: .14s; }
+  #tl .tl-img { position: relative; height: 182px; border-radius: 18px; background-size: cover; background-position: center; overflow: hidden; }
+  #tl .tl-img::after { content: ""; position: absolute; inset: 0; background: radial-gradient(120% 100% at 50% 0, transparent 55%, rgba(0,0,0,.16)); }
+  #tl .tl-pill { position: absolute; z-index: 1; top: 14px; left: 14px; padding: 6px 12px; border-radius: 99px; font-size: 11px; letter-spacing: .04em; background: rgba(255, 252, 246, .92); }
+  #tl .tl-txt { padding: 22px 12px 14px; }
+  #tl .tl-eyebrow { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--maroon); }
+  #tl .tl-title { margin: 14px 0; font-size: 22px; line-height: 1.2; font-weight: 500; letter-spacing: -.015em; }
+  #tl .tl-desc { margin: 0 0 22px; font-size: 13.5px; line-height: 1.6; color: #857a7b; }
+  #tl .tl-link { display: inline-flex; align-items: center; gap: 10px; font-size: 14px; color: var(--maroon); text-decoration: none; }
+  #tl .tl-link svg { width: 12px; height: 12px; transition: transform .3s ease; }
+  #tl .tl-link:hover svg { transform: translate(2px, -2px); }
+
+  /* ---------- line, marker, stem ---------- */
+  #tl .tl-svg { position: relative; display: block; width: 100%; height: 110px; margin-top: 4px; overflow: visible; }
+  #tl .tl-line { fill: none; stroke: var(--maroon); stroke-width: 1.4; }
+  #tl .tl-line2 { fill: none; stroke: #d9cfc4; stroke-width: 1.2; opacity: .8; }
+  #tl .tl-dot { fill: var(--maroon); }
+  #tl .tl-stem { position: absolute; top: var(--top); width: 1.5px; height: 20px; margin-left: -.75px; background: var(--maroon); pointer-events: none; }
+  #tl .tl-marker {
+    position: absolute; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 50%;
+    background: var(--card); border: 1px solid rgba(106, 44, 71, .14); box-shadow: 0 4px 10px rgba(70, 40, 40, .14);
+    display: grid; place-items: center; pointer-events: none; will-change: transform;
+  }
+  #tl .tl-marker::after { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--maroon); }
+
+  /* ---------- years ---------- */
+  #tl .tl-years { display: grid; margin: 8px 0 0; padding: 0; list-style: none; }
+  #tl .tl-year { display: block; width: 100%; appearance: none; background: none; border: 0; padding: 6px 0 4px; cursor: pointer; text-align: center; font: inherit; color: var(--mute); -webkit-tap-highlight-color: transparent; }
+  #tl .tl-year b { display: block; font-size: clamp(22px, 3.2vw, 38px); font-weight: 400; letter-spacing: -.02em; line-height: 1.1; transition: color .45s ease, transform .5s cubic-bezier(.2, .8, .2, 1); }
+  #tl .tl-year span { display: block; margin-top: 10px; font-size: 11px; letter-spacing: .03em; transition: color .45s ease; }
+  #tl .tl-year.is-on { color: var(--maroon); }
+  #tl .tl-year.is-on b { transform: scale(1.04); }
+  #tl .tl-year:focus-visible { outline: 2px solid var(--maroon); outline-offset: 4px; border-radius: 8px; }
+
+  @media (max-width: 640px) {
+    #tl { --top: 520px; }
+    #tl .tl-year span { font-size: 9.5px; }
+  }
+  @media (prefers-reduced-motion: reduce) { #tl .tl-body, #tl .tl-year b { transition-duration: .01s; } }
+</style>
+</head>
+<body>
+
+<!-- Paste this one line anywhere. Edit the chapters in the ITEMS list below. -->
+<section id="tl" aria-label="Timeline"></section>
+
+<script>
+(function () {
+  const root = document.getElementById("tl");
+  if (!root) return;
+
+  /* ============ 1. YOUR CHAPTERS ============
+     year / label   : shown under the line
+     eyebrow, title : title can use \n for a line break
+     text, href     : paragraph and "Explore chapter" link
+     image          : a CSS background value (gradient or url(...)). Use url("./photo.jpg") for real photos */
+  const ITEMS = [
+    { year: "2018", label: "First spark", eyebrow: "First spark", title: "One shared table.\nA world of ideas.", href: "#",
+      text: "We began with two people, one shared table, and a simple belief: thoughtful design can turn small ideas into lasting possibilities.",
+      image: "linear-gradient(115deg, transparent 0 16%, rgba(70,45,30,.28) 16% 22%, transparent 22% 33%, rgba(70,45,30,.22) 33% 37%, transparent 37%), linear-gradient(100deg, transparent 54%, #f7eadb 54% 94%, #3a2a22 94%), linear-gradient(180deg, #d8aa8a, #a8745a)" },
+    { year: "2020", label: "A new direction", eyebrow: "A new direction", title: "One clear vision.\nA voice of our own.", href: "#",
+      text: "We brought strategy, identity, and digital into one practice, shaping a clear creative voice through patient work and a shared curiosity.",
+      image: "repeating-linear-gradient(0deg, transparent 0 14px, rgba(255,255,255,.16) 14px 16px), linear-gradient(90deg, #6c6a55 0 18%, #cbcdc1 18% 62%, #8e8f7d 62%)" },
+    { year: "2022", label: "The turning point", eyebrow: "The turning point", title: "More curious minds.\nA wider perspective.", href: "#",
+      text: "We welcomed new minds and fresh perspectives, growing into a creative collective with more ways to explore, collaborate, and make things.",
+      image: "radial-gradient(60% 80% at 30% 105%, #b2a982, transparent 70%), linear-gradient(180deg, #2b2d25, #6d6a52)" },
+    { year: "2024", label: "Beyond borders", eyebrow: "Beyond borders", title: "New places to meet.\nA closer connection.", href: "#",
+      text: "We opened new studios and welcomed new voices, bringing our work closer to the people and places it is made for.",
+      image: "repeating-linear-gradient(78deg, #e9eee0 0 16px, #2d3b24 16px 42px)" },
+    { year: "2026", label: "What comes next", eyebrow: "What comes next", title: "New paths to follow.\nA future to shape.", href: "#",
+      text: "We keep looking ahead, with new ideas to try and new paths to follow, shaping what comes next one chapter at a time.",
+      image: "linear-gradient(180deg, rgba(255,255,255,.28), transparent 45%), linear-gradient(90deg, #7a3a08 0 18%, #e59a2c 18% 52%, #f6c66a 52% 70%, #a8560f 70%)" }
+  ];
+
+  /* ============ 2. SETTINGS ============ */
+  const CFG = {
+    amp: 70,        // height of the bump (px)
+    sigma: 48,      // width of the bump (px)
+    base: 100,      // baseline height inside the 110px line area
+    markerSpeed: 9, // bigger = snappier bump
+    cardSpeed: 6    // bigger = card follows faster (smaller = more lag)
+  };
+
+  /* ============ 3. BUILD ============ */
+  const N = ITEMS.length;
+  const NS = "http://www.w3.org/2000/svg";
+  const arrow = '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 9.5 9.5 2.5M4 2.5h5.5V8"/></svg>';
+
+  root.innerHTML =
+    '<div class="tl-wrap">' +
+      '<article class="tl-card"><div class="tl-body"></div></article>' +
+      '<div class="tl-stem"></div>' +
+      '<svg class="tl-svg" aria-hidden="true"><path class="tl-line2"/><path class="tl-line"/></svg>' +
+      '<div class="tl-marker"></div>' +
+      '<ol class="tl-years" style="grid-template-columns:repeat(' + N + ',1fr)"></ol>' +
+    '</div>';
+
+  const wrap = root.querySelector(".tl-wrap"), card = root.querySelector(".tl-card"), body = root.querySelector(".tl-body");
+  const svg = root.querySelector(".tl-svg"), line = root.querySelector(".tl-line"), line2 = root.querySelector(".tl-line2");
+  const stem = root.querySelector(".tl-stem"), marker = root.querySelector(".tl-marker"), list = root.querySelector(".tl-years");
+
+  const dots = ITEMS.map(() => { const c = document.createElementNS(NS, "circle"); c.setAttribute("r", 3); c.setAttribute("class", "tl-dot"); svg.appendChild(c); return c; });
+  const years = ITEMS.map((it, i) => {
+    const li = document.createElement("li"), b = document.createElement("button");
+    b.className = "tl-year"; b.type = "button";
+    b.innerHTML = "<b>" + it.year + "</b><span>" + it.label + "</span>";
+    b.setAttribute("aria-label", it.year + ", " + it.label);
+    b.addEventListener("pointerenter", e => { if (e.pointerType === "mouse") go(i); });
+    b.addEventListener("click", () => go(i));
+    b.addEventListener("focus", () => go(i));
+    li.appendChild(b); list.appendChild(li);
+    return b;
+  });
+
+  const content = it =>
+    '<div class="tl-img" style="background:' + it.image.replace(/"/g, "&quot;") + ';background-size:cover;background-position:center"><span class="tl-pill">' + it.year + '</span></div>' +
+    '<div class="tl-txt"><div class="tl-eyebrow">' + it.eyebrow + '</div>' +
+    '<h3 class="tl-title">' + it.title.replace("\n", "<br>") + '</h3><p class="tl-desc">' + it.text + '</p>' +
+    '<a class="tl-link" href="' + (it.href || "#") + '">Explore chapter ' + arrow + '</a></div>';
+
+  /* ============ 4. MOTION ============ */
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let W = 0, svgTop = 0, cardW = 0, cur = 0, bx = 0, cx = 0, tx = 0, raf = 0, last = 0, swapT = 0;
+  const stopX = i => (i + 0.5) * W / N;
+  const bump = x => CFG.amp * Math.exp(-((x - bx) * (x - bx)) / (2 * CFG.sigma * CFG.sigma));
+
+  function draw() {
+    let d = "M0 " + (CFG.base - bump(0)).toFixed(1);
+    for (let x = 3; x <= W + 3; x += 3) d += "L" + x + " " + (CFG.base - bump(x)).toFixed(1);
+    line.setAttribute("d", d);
+    line2.setAttribute("d", d);
+    line2.setAttribute("transform", "translate(0 6)");
+
+    dots.forEach((c, i) => {
+      const x = stopX(i);
+      c.setAttribute("cx", x);
+      c.setAttribute("cy", (CFG.base - bump(x)).toFixed(1));
+      c.setAttribute("opacity", Math.min(1, Math.abs(x - bx) / 34).toFixed(2));
+    });
+
+    const top = svgTop;
+    marker.style.transform = "translate(" + bx.toFixed(1) + "px," + (top + CFG.base - CFG.amp).toFixed(1) + "px)";
+    marker.style.left = "0"; marker.style.top = "0";
+    stem.style.left = bx.toFixed(1) + "px";
+
+    const half = cardW / 2, x = Math.min(Math.max(cx, half), W - half);
+    card.style.transform = "translateX(" + (x - half).toFixed(1) + "px)";
+  }
+
+  function tick(t) {
+    const dt = Math.min((t - last) / 1000, 0.05); last = t;
+    bx += (tx - bx) * (1 - Math.exp(-dt * CFG.markerSpeed));
+    cx += (tx - cx) * (1 - Math.exp(-dt * CFG.cardSpeed));
+    draw();
+    if (Math.abs(tx - bx) > 0.1 || Math.abs(tx - cx) > 0.1) raf = requestAnimationFrame(tick);
+    else { bx = cx = tx; draw(); raf = 0; }
+  }
+  function run() { if (!raf) { last = performance.now(); raf = requestAnimationFrame(tick); } }
+
+  function go(i) {
+    if (i === cur && body.innerHTML) return;
+    const first = !body.innerHTML;
+    cur = i;
+    tx = stopX(i);
+    years.forEach((y, k) => { y.classList.toggle("is-on", k === i); y.setAttribute("aria-current", k === i ? "true" : "false"); });
+    clearTimeout(swapT);
+    if (first) body.innerHTML = content(ITEMS[i]);
+    else {
+      body.classList.add("out");
+      swapT = setTimeout(() => { body.innerHTML = content(ITEMS[i]); body.classList.remove("out"); }, 150);
+    }
+    if (reduce) { bx = cx = tx; draw(); } else run();
+  }
+
+  function layout() {
+    W = wrap.clientWidth;
+    svg.setAttribute("viewBox", "0 0 " + W + " 110");
+    cardW = card.offsetWidth;
+    svgTop = svg.getBoundingClientRect().top - wrap.getBoundingClientRect().top;
+    tx = stopX(cur); bx = cx = tx;
+    draw();
+  }
+
+  root.addEventListener("keydown", e => {
+    if (e.key === "ArrowRight") { go((cur + 1) % N); years[cur].focus(); }
+    if (e.key === "ArrowLeft")  { go((cur - 1 + N) % N); years[cur].focus(); }
+  });
+
+  if ("ResizeObserver" in window) new ResizeObserver(layout).observe(wrap);
+  else window.addEventListener("resize", layout);
+
+  body.innerHTML = "";
+  layout();
+  go(0);
+  bx = cx = tx; draw();
+})();
+</script>
+</body>
+</html>
