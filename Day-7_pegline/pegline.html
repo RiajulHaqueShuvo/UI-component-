@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pegline</title>
+<style>
+  html, body { margin: 0; background: #fff; }
+
+  /* Pegline - scoped to #pegline (classes prefixed "pg-"), safe to paste into any page */
+  #pegline {
+    --s: 1;                                   /* scale factor, set by the script from the photo size */
+    box-sizing: border-box; display: block; padding: clamp(20px, 5vh, 64px) 0;
+    background: #fff; overflow: hidden; cursor: grab; touch-action: pan-y;
+    -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 3%, #000 97%, transparent);
+            mask-image: linear-gradient(90deg, transparent, #000 3%, #000 97%, transparent);
+  }
+  #pegline.is-drag { cursor: grabbing; }
+  #pegline *, #pegline *::before, #pegline *::after { box-sizing: border-box; }
+
+  #pegline .pg-stage { position: relative; width: 100%; perspective: 1200px; perspective-origin: 50% 20%; }   /* perspective is set by the script */
+  #pegline .pg-string { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+  #pegline .pg-string path:first-child { fill: none; stroke: #d9d0c6; stroke-width: 1.4; }
+  #pegline .pg-string path:last-child  { fill: none; stroke: #fff; stroke-opacity: .8; stroke-width: .6; transform: translateY(-.6px); }
+
+  #pegline .pg-hang { position: absolute; left: 0; top: 0; transform-origin: 50% 0; will-change: transform; backface-visibility: hidden; }
+  #pegline .pg-card {
+    position: relative; margin-top: calc(17px * var(--s)); width: 100%; border-radius: calc(16px * var(--s)); overflow: hidden;
+    background: #ece7e1; box-shadow: 0 22px 30px -16px rgba(30, 20, 10, .34), 0 2px 6px rgba(30, 20, 10, .08);
+    transition: transform .5s cubic-bezier(.2, .8, .2, 1), box-shadow .5s ease; transform-origin: 50% 0;
+  }
+  #pegline .pg-hang:hover .pg-card { transform: scale(1.045); box-shadow: 0 30px 40px -16px rgba(30, 20, 10, .4), 0 2px 6px rgba(30, 20, 10, .1); }
+  #pegline .pg-art { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: 0; transition: opacity .7s ease; }
+  #pegline .pg-art.on { opacity: 1; }
+  #pegline .pg-cap {
+    position: absolute; left: 0; right: 0; bottom: 0; padding: calc(46px * var(--s)) calc(16px * var(--s)) calc(15px * var(--s)); color: #fff;
+    background: linear-gradient(transparent, rgba(0, 0, 0, .55));
+    opacity: 0; transform: translateY(10px); transition: opacity .35s ease, transform .45s cubic-bezier(.2, .8, .2, 1);
+  }
+  #pegline .pg-hang:hover .pg-cap { opacity: 1; transform: none; }
+  #pegline .pg-cap b { display: block; font: 600 calc(15px * var(--s))/1.2 Inter, "Helvetica Neue", Arial, sans-serif; }
+  #pegline .pg-cap span { display: block; margin-top: 4px; font: 400 calc(11.5px * var(--s))/1.3 Inter, "Helvetica Neue", Arial, sans-serif; opacity: .82; }
+
+  @media (hover: none) { #pegline .pg-cap { opacity: 1; transform: none; } }
+
+  /* clothespin */
+  #pegline .pg-pin {
+    position: absolute; z-index: 2; left: calc(50% - 6.5px * var(--s)); top: calc(-28px * var(--s)); width: calc(13px * var(--s)); height: calc(50px * var(--s)); border-radius: 3px 3px 5px 5px;
+    background: linear-gradient(90deg, #b24526, #e27d55 45%, #b24526); box-shadow: 0 3px 5px rgba(0, 0, 0, .22); pointer-events: none;
+  }
+  #pegline .pg-pin::before { content: ""; position: absolute; left: 50%; top: 3px; bottom: 6px; width: 1px; background: rgba(90, 30, 10, .35); }
+  #pegline .pg-pin::after { content: ""; position: absolute; left: 0; right: 0; top: 44%; height: 14%; background: linear-gradient(#efe0ad, #cdb878); }
+</style>
+</head>
+<body>
+
+<!-- Paste this one line anywhere. Everything else is set in the script below. -->
+<section id="pegline" aria-label="Photo gallery"><div class="pg-stage"></div></section>
+
+<script>
+(function () {
+  const root = document.getElementById("pegline");
+  if (!root) return;
+  const stage = root.querySelector(".pg-stage");
+
+  /* ============ 1. YOUR PHOTOS ============
+     Put your images in the ASSET_DIR folder and list the file NAMES below, without .jpg / .png.
+     Each name is tried as .jpg, .png, .jpeg and .webp, so a mix of png and jpg just works.
+     title / sub : the text shown on hover.   You can also give a full  src: "./x/y.jpg"  for one item.   */
+  const ASSET_DIR = "./assets/";
+  const EXTS = ["jpg", "png", "jpeg", "webp"];
+
+  const SAREES = [
+    ["new_saree collection 1", "Lavender Drape"],  ["new_saree collection 2", "Crimson Bloom"],
+    ["new_saree collection 3", "Ivory & Indigo"],  ["new_saree collection 4", "Blush Petals"],
+    ["new_saree collection 5", "Rose Pink"],       ["new_saree collection 6", "Sage Green"],
+    ["new_saree collection 7", "Orchid Net"],      ["new_saree collection 8", "Wine Classic"]
+  ].map(([file, title]) => ({ file, title, sub: "New saree collection" }));
+
+  const DRESSES = [
+    ["Party dress 1", "Sky Blue Lehenga"], ["Party dress 2", "Maroon Zari"],
+    ["Party dress 3", "Mauve Mist"],       ["Party dress 4", "Midnight Indigo"],
+    ["Party dress 5", "Bridal Red"],       ["Party dress 6", "Ivory Gold"],
+    ["Party dress 8", "Silver Frost"],     ["Party dress 9", "Burgundy Bloom"]
+  ].map(([file, title]) => ({ file, title, sub: "Party dress" }));
+
+  // alternate saree / dress so neighbouring photos have different colours
+  const ITEMS = [];
+  for (let i = 0; i < Math.max(SAREES.length, DRESSES.length); i++) {
+    if (SAREES[i]) ITEMS.push(SAREES[i]);
+    if (DRESSES[i]) ITEMS.push(DRESSES[i]);
+  }
+
+  // big photos are shrunk once in memory (smaller = smoother): less GPU memory, no decode stutter
+  function shrink(im, url) {
+    return new Promise(res => {
+      const MAXW = CFG.maxImageWidth;
+      const plain = () => (im.decode ? im.decode() : Promise.resolve()).then(() => res(url), () => res(url));
+      if (!MAXW || im.naturalWidth <= MAXW) return plain();
+      try {
+        const c = document.createElement("canvas");
+        c.width = MAXW; c.height = Math.round(im.naturalHeight * MAXW / im.naturalWidth);
+        c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
+        c.toBlob(b => res(b ? URL.createObjectURL(b) : url), "image/jpeg", 0.86);
+      } catch (e) { plain(); }      // e.g. opened straight from a folder (file://): keep the original
+    });
+  }
+
+  // finds the real file for an item (tries each extension, and spaces -> underscores)
+  function findImage(it) {
+    if (it._url) return it._url;
+    return it._url = new Promise(done => {
+      if (it.src) return done(it.src);
+      const tries = [];
+      [it.file, it.file.replace(/ /g, "_")].forEach(n => EXTS.forEach(e => tries.push(ASSET_DIR + encodeURI(n) + "." + e)));
+      (function next(i) {
+        if (i >= tries.length) { console.warn("Pegline: image not found for", it.file); return done(null); }
+        const im = new Image();
+        im.onload = () => shrink(im, tries[i]).then(done);
+        im.onerror = () => next(i + 1);
+        im.src = tries[i];
+      })(0);
+    });
+  }
+
+  /* ============ 2. SETTINGS ============ */
+  const CFG = {
+    speed: 38,        // px per second the line drifts left. Negative = drifts right, 0 = still
+    hoverSlow: 0.25,  // how much it slows while the mouse is over a photo (1 = no slowdown)
+    sag: 0.06,        // how far the string dips in the middle (x screen width)
+    edgeTurn: 60,     // how far the photos at the screen edges turn away (degrees, on a big screen; smaller screens turn less)
+    ratio: 1.5,       // photo height / width. Your portrait photos are about 1.5
+    maxImageWidth: 1200 // big photos are shrunk to this width (px) after loading. 0 = off
+  };
+
+  /* ============ 3. BUILD ============ */
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("class", "pg-string");
+  const p1 = document.createElementNS(NS, "path"), p2 = document.createElementNS(NS, "path");
+  svg.append(p1, p2);
+  stage.appendChild(svg);
+
+  const SIZES = [1, 1.04, 0.97, 1.02, 0.95, 1.03, 0.98, 1.05];  // slight size variety, like real prints
+  const cards = [];
+  let count = 0;
+
+  function addCards(n) {
+    for (; count < n; count++) {
+      const it = ITEMS[count % ITEMS.length];
+      const el = document.createElement("figure");
+      el.className = "pg-hang";
+      el.style.margin = "0";
+      el.innerHTML = `<div class="pg-pin"></div><div class="pg-card"><div class="pg-art" style="background-position:center 18%"></div>` +
+                     `<figcaption class="pg-cap"><b>${it.title}</b><span>${it.sub}</span></figcaption></div>`;
+      const artEl = el.querySelector(".pg-art");
+      findImage(it).then(url => { if (url) { artEl.style.backgroundImage = `url("${url}")`; requestAnimationFrame(() => artEl.classList.add("on")); } });
+      el.addEventListener("pointerenter", e => { if (e.pointerType === "mouse") hovering++; });
+      el.addEventListener("pointerleave", e => { if (e.pointerType !== "mouse") return; hovering = Math.max(0, hovering - 1); hoverHold = performance.now() + 350; });
+      stage.appendChild(el);
+      cards.push({ el, card: el.querySelector(".pg-card"), f: SIZES[count % SIZES.length], a: 0, av: 0, k: 30 + (count % 5) * 4, ph: count * 0.9 });
+    }
+  }
+
+  /* ============ 4. LAYOUT ============ */
+  let vw = 0, W = 0, H = 0, pitch = 0, total = 0, y0 = 0, sag = 0;
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const stringY = x => y0 + sag * 4 * (x / vw) * (1 - x / vw);
+  const slope = x => sag * 4 * (1 - 2 * x / vw) / vw;
+
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let S = 1, lastVH = 0, cruise = 0, edgeTurn = 60;
+  function layout() {
+    vw = root.clientWidth;
+    const vh = window.innerHeight;
+    lastVH = vh;
+
+    // how many photos fit across: ~1.7 on a phone, ~3 on a tablet, ~4.6 on a laptop / monitor
+    const across = clamp(vw / 280, 1.7, 4.6);
+    W = vw / (across * 1.13);
+
+    // never taller than the screen: shrink the photos on short screens (landscape phone, small laptop)
+    sag = clamp(vw * CFG.sag, 24, 160);
+    const avail = Math.max(vh * 0.9, 300);
+    W = Math.min(W, (avail - sag - 64) / (1.16 * CFG.ratio));
+    W = Math.max(W, 96);
+
+    H = W * CFG.ratio;
+    pitch = W * 1.13;
+    S = clamp(W / 280, 0.6, 1.8);
+    y0 = Math.max(24, H * 0.1);
+    root.style.setProperty("--s", S.toFixed(3));
+    stage.style.perspective = Math.round(W * 4.2) + "px";   // depth effect grows with the photos
+    edgeTurn = CFG.edgeTurn * clamp(vw / 1200, 0.45, 1);    // phones: gentler turn at the edges
+    cruise = reduce ? 0 : CFG.speed * (W / 260);            // same drift feel on every screen size
+
+    addCards(Math.max(ITEMS.length, Math.ceil(vw / pitch) + 4));
+    total = count * pitch;
+    stage.style.height = Math.round(y0 + sag + 17 * S + H * 1.06 + 56 * S) + "px";
+
+    cards.forEach(c => { c.el.style.width = (W * c.f).toFixed(1) + "px"; c.card.style.height = (H * c.f).toFixed(1) + "px"; });
+
+    let d = "";
+    for (let x = -60; x <= vw + 60; x += 20) d += (d ? "L" : "M") + x + " " + stringY(x).toFixed(1);
+    p1.setAttribute("d", d); p2.setAttribute("d", d);
+  }
+
+  /* ============ 5. MOTION ============ */
+  let offset = 0, vel = 0, hovering = 0, hoverHold = 0, hoverMix = 0, dragging = false, last = performance.now(), t = 0, inView = true;
+
+  function frame(now) {
+    requestAnimationFrame(frame);
+    if (!inView) { last = now; return; }
+    const dt = Math.min((now - last) / 1000, 0.05); last = now; t += dt;
+
+    const isHover = hovering > 0 || now < hoverHold;
+    hoverMix += ((isHover ? 1 : 0) - hoverMix) * (1 - Math.exp(-dt * 2.2));
+    const goal = cruise * (1 - (1 - CFG.hoverSlow) * hoverMix);
+    if (!dragging) {
+      vel += (goal - vel) * (1 - Math.exp(-dt * 1.5));
+      offset += vel * dt;
+    }
+    const lean = dragging || Math.abs(vel - goal) > 1 ? clamp(-(vel - goal) * 0.0012, -0.4, 0.4) : 0;   // tilt only when pushed
+
+    for (let i = 0; i < cards.length; i++) {
+      const c = cards[i];
+      let x = (((i * pitch - offset + pitch) % total) + total) % total - pitch + pitch / 2;
+      const y = stringY(x);
+      const u = (x - vw / 2) / (vw / 2);
+      const turn = -Math.sign(u) * Math.pow(Math.min(Math.abs(u), 1.3), 2.2) * edgeTurn;
+
+      c.av += ((lean - c.a) * c.k - c.av * 1.7 * Math.sqrt(c.k)) * dt;      // spring: cards swing when the line speeds up or slows down
+      c.a += c.av * dt;
+      const ang = Math.atan(slope(x)) + c.a + Math.sin(t * 0.6 + c.ph) * 0.006;
+
+      c.el.style.transform = "translate3d(" + (x - W * c.f / 2).toFixed(2) + "px," + y.toFixed(2) + "px,0) rotateY(" + turn.toFixed(2) + "deg) rotateZ(" + ang.toFixed(5) + "rad)";
+    }
+  }
+
+  /* ============ 6. INPUT ============ */
+  let lastX = 0, lastT = 0;
+  root.addEventListener("pointerdown", e => {
+    dragging = true; lastX = e.clientX; lastT = performance.now(); vel = 0;
+    root.classList.add("is-drag");
+    if (root.setPointerCapture) root.setPointerCapture(e.pointerId);
+  });
+  root.addEventListener("pointermove", e => {
+    if (!dragging) return;
+    const now = performance.now(), dx = e.clientX - lastX, dtS = Math.max(now - lastT, 1) / 1000;
+    offset -= dx;
+    vel = clamp(vel * 0.6 + (-dx / dtS) * 0.4, -3500, 3500);
+    lastX = e.clientX; lastT = now;
+  });
+  const endDrag = () => { dragging = false; root.classList.remove("is-drag"); };
+  root.addEventListener("pointerup", endDrag);
+  root.addEventListener("pointercancel", endDrag);
+
+  root.addEventListener("wheel", e => {
+    const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : 0;
+    if (!d) return;
+    e.preventDefault();
+    vel = clamp(vel + d * 3, -3500, 3500);
+  }, { passive: false });
+
+  if ("IntersectionObserver" in window) new IntersectionObserver(en => inView = en.some(x => x.isIntersecting)).observe(root);
+  // re-layout when the width changes; ignore the small height changes of a phone's address bar while scrolling
+  const onResize = () => { if (root.clientWidth === vw && Math.abs(window.innerHeight - lastVH) < 160) return; layout(); };
+  if ("ResizeObserver" in window) new ResizeObserver(onResize).observe(root);
+  window.addEventListener("resize", onResize);
+  window.addEventListener("orientationchange", () => setTimeout(layout, 200));
+
+  layout();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

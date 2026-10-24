@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chromadrift</title>
+<style>
+  html, body { margin: 0; background: #fdfdfd; }
+
+  /* Chromadrift - scoped to #chromadrift (classes prefixed "cd-"), safe to paste into any page */
+  #chromadrift {
+    --u: clamp(70px, 9.7vw, 132px);           /* one "small" tile height. Big tiles are 2 x this */
+    --bg: #fdfdfd;
+    box-sizing: border-box; min-height: 100vh; display: flex; flex-direction: column; justify-content: center;
+    background: var(--bg); overflow: hidden;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 3%, #000 97%, transparent);
+            mask-image: linear-gradient(90deg, transparent, #000 3%, #000 97%, transparent);
+  }
+  #chromadrift *, #chromadrift *::before, #chromadrift *::after { box-sizing: border-box; }
+
+  #chromadrift .cd-row { height: calc(var(--u) * 2 + 1px); overflow: hidden; }
+  #chromadrift .cd-track {
+    display: flex; align-items: flex-start; width: max-content; height: 100%;
+    animation: cd-drift var(--dur, 60s) linear infinite; animation-direction: var(--dir, normal);
+    animation-delay: var(--off, 0s); will-change: transform;
+  }
+  @keyframes cd-drift { to { transform: translate3d(-50%, 0, 0); } }
+
+  #chromadrift .cd-tile { flex: none; position: relative; cursor: pointer; background: #ece9e4; aspect-ratio: var(--ar); height: var(--u); overflow: hidden; }
+  #chromadrift .cd-tile.big { height: calc(var(--u) * 2); }
+  #chromadrift .cd-art {
+    position: absolute; inset: 0; background-size: cover; background-position: center 15%;
+    filter: grayscale(1) contrast(1.06); opacity: 0;
+    transition: filter .7s cubic-bezier(.2, .7, .2, 1), opacity .8s ease;
+  }
+  #chromadrift .cd-art.on { opacity: 1; }
+  #chromadrift .cd-tile:hover .cd-art { filter: grayscale(0) contrast(1.02) saturate(1.1); transition-duration: .35s; }
+
+  @media (prefers-reduced-motion: reduce) { #chromadrift .cd-track { animation: none; } }
+</style>
+</head>
+<body>
+
+<!-- Paste this one line anywhere. Everything else is set in the script below. -->
+<section id="chromadrift" aria-label="Image gallery"></section>
+
+<script>
+(function () {
+  const root = document.getElementById("chromadrift");
+  if (!root) return;
+
+  /* ============ 1. YOUR IMAGES ============
+     Put your photos in the ASSET_DIR folder and list the file NAMES below, without .jpg / .png.
+     Each name is tried as .jpg, .png, .jpeg and .webp, so any mix of file types just works.
+     Leave FILES empty to get generated artwork instead.
+     Photos can be colour: Chromadrift turns them grey and brings the colour back on hover.       */
+  const ASSET_DIR = "./assets/";
+  const EXTS = ["jpg", "png", "jpeg", "webp"];
+
+  const SAREES = ["new_saree collection 1", "new_saree collection 2", "new_saree collection 3", "new_saree collection 4",
+                  "new_saree collection 5", "new_saree collection 6", "new_saree collection 7", "new_saree collection 8"];
+  const DRESSES = ["Party dress 1", "Party dress 2", "Party dress 3", "Party dress 4",
+                   "Party dress 5", "Party dress 6", "Party dress 8", "Party dress 9"];
+
+  // alternate saree / dress so neighbouring tiles have different colours
+  const FILES = [];
+  for (let i = 0; i < Math.max(SAREES.length, DRESSES.length); i++) {
+    if (SAREES[i]) FILES.push({ file: SAREES[i] });
+    if (DRESSES[i]) FILES.push({ file: DRESSES[i] });
+  }
+
+  // big photos are shrunk once in memory, so they stay smooth
+  function shrink(im, url) {
+    return new Promise(res => {
+      const MAXW = CFG.maxImageWidth;
+      const plain = () => (im.decode ? im.decode() : Promise.resolve()).then(() => res(url), () => res(url));
+      if (!MAXW || im.naturalWidth <= MAXW) return plain();
+      try {
+        const c = document.createElement("canvas");
+        c.width = MAXW; c.height = Math.round(im.naturalHeight * MAXW / im.naturalWidth);
+        c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
+        c.toBlob(b => res(b ? URL.createObjectURL(b) : url), "image/jpeg", 0.86);
+      } catch (e) { plain(); }     // e.g. opened straight from a folder (file://): keep the original
+    });
+  }
+
+  // finds the real file for a name (tries each extension, then spaces -> underscores)
+  function findImage(it) {
+    if (it._p) return it._p;
+    return it._p = new Promise(done => {
+      const tries = [];
+      [it.file, it.file.replace(/ /g, "_")].forEach(n => EXTS.forEach(e => tries.push(ASSET_DIR + encodeURI(n) + "." + e)));
+      (function next(i) {
+        if (i >= tries.length) { console.warn("Chromadrift: image not found for", it.file); return done(null); }
+        const im = new Image();
+        im.onload = () => shrink(im, tries[i]).then(done);
+        im.onerror = () => next(i + 1);
+        im.src = tries[i];
+      })(0);
+    });
+  }
+
+  /* ============ 2. SETTINGS ============ */
+  const CFG = {
+    rows: [
+      { speed: 14, dir: 1 },    // px per second.  dir: 1 = drifts left, -1 = drifts right
+      { speed: 22, dir: 1 }
+    ],
+    perRow: 12,                 // tiles per row (alternating big and small)
+    maxImageWidth: 700          // photos are shrunk to this width (px) after loading. 0 = off
+  };
+
+  /* ============ 3. TILE ARTWORK (generated, so no files are needed) ============ */
+  let seed = 7;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const pick = a => a[Math.floor(rnd() * a.length)];
+  const rad = (x, y, w, h, col) => `radial-gradient(${w}% ${h}% at ${x}% ${y}%, ${col}, transparent 72%)`;
+
+  function art() {
+    const h1 = Math.floor(rnd() * 360), h2 = (h1 + 50 + Math.floor(rnd() * 90)) % 360;
+    const c1 = `hsl(${h1} 85% 58%)`, c2 = `hsl(${h2} 90% 52%)`;
+    const base = `linear-gradient(${Math.floor(rnd() * 360)}deg, hsl(${h1} 45% 18%), hsl(${h2} 55% 42%))`;
+    const k = pick(["portrait", "portrait", "orb", "stripes", "arc"]);
+    let layers = [];
+    if (k === "portrait") {
+      const x = 42 + rnd() * 16;
+      layers = [rad(x, 36, 20, 24, `hsl(${h1} 55% 14%)`), rad(x, 36, 34, 40, `hsl(${h2} 60% 72%)`), rad(50, 108, 70, 42, `hsl(${h1} 40% 10%)`), rad(20 + rnd() * 60, 20, 60, 50, c1)];
+    } else if (k === "orb") {
+      layers = [rad(30 + rnd() * 40, 40 + rnd() * 30, 38, 30, "#fff"), rad(50, 50, 80, 70, c1), rad(70, 80, 60, 50, c2)];
+    } else if (k === "stripes") {
+      layers = [`repeating-linear-gradient(${pick([20, 62, 110, 150])}deg, transparent 0 ${8 + Math.floor(rnd() * 10)}px, rgba(255,255,255,.55) 0 ${14 + Math.floor(rnd() * 14)}px)`, rad(60, 30, 60, 50, c1), rad(30, 80, 60, 50, c2)];
+    } else {
+      layers = [`radial-gradient(circle at ${20 + rnd() * 60}% 118%, transparent 0 34%, ${c1} 34% 46%, transparent 46% 56%, ${c2} 56% 64%, transparent 64%)`, rad(50, 10, 80, 40, `hsl(${h2} 80% 78%)`)];
+    }
+    return layers.concat(base).join(",");
+  }
+
+  /* ============ 4. BUILD ============ */
+  const AR = [.63, .68, .82, .65, .78, .8];      // width / height of tiles, cycled for a natural rhythm
+  let imgIdx = 0;
+
+  function makeRow(cfg, r) {
+    const row = document.createElement("div");
+    row.className = "cd-row";
+    const track = document.createElement("div");
+    track.className = "cd-track";
+
+    const tiles = [];
+    for (let i = 0; i < CFG.perRow; i++) {
+      const big = (i + r) % 2 === 0;
+      const t = document.createElement("div");
+      t.className = "cd-tile " + (big ? "big" : "small");
+      t.style.setProperty("--ar", AR[(i * 5 + r * 3) % AR.length]);
+      const a = document.createElement("div");
+      a.className = "cd-art";
+      if (FILES.length) a.dataset.k = imgIdx++ % FILES.length;
+      else { a.style.backgroundImage = art(); a.className += " on"; }
+      t.appendChild(a);
+      t.style.marginRight = "calc(var(--u) * " + (0.3 + rnd() * 0.9).toFixed(2) + ")";
+      tiles.push(t);
+    }
+    // the list is repeated once so the loop has no visible seam
+    tiles.forEach(t => track.appendChild(t));
+    tiles.forEach(t => { const c = t.cloneNode(true); c.setAttribute("aria-hidden", "true"); track.appendChild(c); });
+    row.appendChild(track);
+    root.appendChild(row);
+    return { track, cfg };
+  }
+
+  const rows = CFG.rows.map(makeRow);
+
+  // load every photo once, then paint it on all the tiles (and their loop copies) that use it
+  FILES.forEach((it, k) => findImage(it).then(url => {
+    if (!url) return;
+    root.querySelectorAll('.cd-art[data-k="' + k + '"]').forEach(a => {
+      a.style.backgroundImage = 'url("' + url + '")';
+      requestAnimationFrame(() => a.classList.add("on"));
+    });
+  }));
+
+  /* ============ 5. SPEED ============ */
+  function setSpeed() {
+    rows.forEach(({ track, cfg }, i) => {
+      const half = track.scrollWidth / 2;
+      const dur = Math.max(half / Math.abs(cfg.speed), 1);
+      track.style.setProperty("--dur", dur.toFixed(1) + "s");
+      track.style.setProperty("--dir", cfg.dir < 0 ? "reverse" : "normal");
+      track.style.setProperty("--off", (-dur * (0.17 + i * 0.41) % dur).toFixed(1) + "s");
+    });
+  }
+  setSpeed();
+  if ("ResizeObserver" in window) new ResizeObserver(setSpeed).observe(root);
+  else window.addEventListener("resize", setSpeed);
+})();
+</script>
+</body>
+</html>
