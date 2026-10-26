@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slant Deck – slider section</title>
+<style>
+  /* ── demo page only (তোমার সাইটে এই অংশ লাগবে না) ── */
+  html,body{margin:0;background:#0d0d0e;font-family:"Helvetica Neue",Arial,sans-serif}
+  .demo-strip{height:22vh;display:grid;place-items:center;color:#777;font-size:14px;letter-spacing:.08em;text-transform:uppercase}
+
+  /* ═════════════ SLANT DECK — CSS START ═════════════ */
+  .sld{
+    position:relative; width:100%;
+    height:clamp(560px,50vw,800px);
+    overflow:hidden; background:#000; color:#fff;
+    font-family:"Inter","Helvetica Neue",Arial,sans-serif;
+    cursor:grab; outline:none;
+    user-select:none; -webkit-user-select:none;
+    touch-action:pan-y;
+  }
+  .sld *{box-sizing:border-box}
+  .sld.is-drag{cursor:grabbing}
+
+  .sld-card{
+    position:absolute; left:0; top:0;
+    border-radius:9px; overflow:hidden; background:#111;
+    will-change:transform,opacity; transform-origin:50% 50%;
+    box-shadow:0 18px 50px rgba(0,0,0,.55);
+  }
+  .sld-card.is-side{cursor:pointer}
+  .sld-card img{
+    position:absolute; inset:0; width:100%; height:100%; display:block;
+    object-fit:cover; object-position:50% 30%;
+    pointer-events:none; -webkit-user-drag:none;
+  }
+  /* soft dark fade at the bottom so the title is readable */
+  .sld-card::before{
+    content:""; position:absolute; left:0; right:0; bottom:0; height:38%;
+    background:linear-gradient(to top,rgba(0,0,0,.55),rgba(0,0,0,0));
+    z-index:1; pointer-events:none;
+  }
+  .sld-cap{
+    position:absolute; left:16px; right:16px; bottom:14px; z-index:2;
+    font-size:15px; font-weight:500; letter-spacing:.01em;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  /* dims the cards that are not in front */
+  .sld-shade{position:absolute;inset:0;background:#000;opacity:0;z-index:3;pointer-events:none}
+  /* ═════════════ SLANT DECK — CSS END ═════════════ */
+</style>
+</head>
+<body>
+
+<div class="demo-strip">↓ your content above ↓</div>
+
+<!-- ═════════════ SLANT DECK — HTML START ═════════════ -->
+<section class="sld" id="slant-deck" tabindex="0" aria-roledescription="carousel" aria-label="Slant Deck gallery"></section>
+<!-- ═════════════ SLANT DECK — HTML END ═════════════ -->
+
+<div class="demo-strip">↑ your content below ↑</div>
+
+<script>
+/* ═════════════ SLANT DECK — JS START ═════════════ */
+(function () {
+  /* ───────── ১) ছবি + লেখা সেটিং ───────── */
+  const CONFIG = {
+    folder: "assets/",                      // ছবির ফোল্ডার (HTML ফাইলের তুলনায়)
+    exts: ["jpg", "png", "jpeg", "webp"],   // jpg/png মিশে থাকলেও নিজে খুঁজে নেবে
+    loop: true,                             // true = শেষ কার্ডের পর আবার প্রথমটা আসে (অনন্ত লুপ), false = শুরু আর শেষ আছে
+    ratio: 1.6,                             // কার্ডের উচ্চতা ÷ প্রস্থ (বেশি = আরও লম্বা কার্ড, ছবি কম কাটা পড়ে)
+    autoplay: 0,                            // 0 = বন্ধ, 3500 = প্রতি ৩.৫ সেকেন্ডে পরের কার্ড
+    wheelVertical: false                    // true দিলে মাউস-হুইলের ওপর/নিচ স্ক্রলেও কার্ড বদলাবে
+  };
+
+  /* file  : ছবির নাম (এক্সটেনশন ছাড়া)   title : কার্ডের ভেতরের নাম
+     text  : (ঐচ্ছিক) ছবির alt লেখা        href  : (ঐচ্ছিক) সামনের কার্ডে ক্লিক করলে যে পেজে যাবে */
+  const SLIDES = [
+    { file: "card_J", title: "Jack of Blades",  text: "Playing-card samurai in bold ink and colour" },
+    { file: "Card2",  title: "Crimson Ronin",   text: "A wandering swordswoman in ornate red armour" },
+    { file: "card3",  title: "Red Kanji",       text: "Black and red steel under a poster of kanji" },
+    { file: "card4",  title: "Sakura Noir",     text: "Pink-haired rebel on a manga-page backdrop" },
+    { file: "card5",  title: "Blue Horizon",    text: "Arms raised against a clear blue sky" },
+    { file: "card6",  title: "Midnight Muse",   text: "Quiet monochrome mood in soft grey light" },
+    { file: "card7",  title: "Ink Ember",       text: "Fiery hair framed by a splash of black ink" },
+    { file: "card9",  title: "Card 09",         text: "Card 09" },     // ← title আর text নিজের মতো বদলে নাও
+    { file: "card10", title: "Card 10",         text: "Card 10" },
+    { file: "card11", title: "Card 11",         text: "Card 11" }
+  ];
+  /* ───────── সেটিং শেষ ───────── */
+
+  const root = document.getElementById("slant-deck");
+  if (!root) return;
+  const N = SLIDES.length;
+  const LOOP = CONFIG.loop && N >= 4;
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const EASE = reduce ? 1 : 0.11;               // smaller = slower, floatier
+  const mod = (a, n) => ((a % n) + n) % n;
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+
+  /* build cards */
+  const items = SLIDES.map((s, j) => {
+    const el = document.createElement(s.href ? "a" : "div");
+    el.className = "sld-card";
+    if (s.href) el.href = s.href;
+    el.innerHTML =
+      `<img alt="${s.text || s.title}" draggable="false">` +
+      `<div class="sld-cap">${s.title}</div><div class="sld-shade"></div>`;
+    root.appendChild(el);
+    const it = { j, el, d: 0, hover: false, img: el.querySelector("img"), shade: el.querySelector(".sld-shade") };
+    el.addEventListener("mouseenter", () => { it.hover = true; render(); });
+    el.addEventListener("mouseleave", () => { it.hover = false; render(); });
+    el.addEventListener("click", e => {
+      if (suppressClick) { e.preventDefault(); return; }
+      if (Math.abs(it.d) > 0.5) { e.preventDefault(); setTarget(Math.round(pos + it.d)); }   // side card → bring to front
+    });
+    return it;
+  });
+
+  /* measurements (from the original 1022×718 design) */
+  let W, H, Cw, Ch, ox, oy;
+  function measure() {
+    W = root.clientWidth; H = root.clientHeight;
+    if (W < 700) { Cw = W * 0.56; Ch = Cw * CONFIG.ratio; ox = Cw * 0.62; }
+    else         { Ch = H * 0.54; Cw = Ch / CONFIG.ratio;  ox = Cw * 0.8;  }
+    oy = Ch * 0.21;
+    items.forEach(it => { it.el.style.width = Cw + "px"; it.el.style.height = Ch + "px"; });
+    render();
+  }
+
+  let pos = 0, target = 0, raf = 0;
+
+  function render() {
+    for (const it of items) {
+      const d = LOOP ? mod(it.j - pos + N / 2, N) - N / 2 : it.j - pos;
+      it.d = d;
+      const a = Math.abs(d);
+      if (a > 2) { it.el.style.visibility = "hidden"; continue; }
+      it.el.style.visibility = "visible";
+
+      const c = clamp(d, -1.5, 1.5);
+      const x = c * ox, y = c * oy;
+      const rz = c * 9;                                    // neighbours lean away
+      const ry = -c * 9;                                   // a little perspective
+      const dim = 0.72 * Math.min(a, 1) - (it.hover && a > 0.5 ? 0.14 : 0);
+
+      it.el.style.transform =
+        `translate3d(${(W / 2 + x - Cw / 2).toFixed(2)}px,${(H / 2 + y - Ch / 2).toFixed(2)}px,0) ` +
+        `perspective(1200px) rotateZ(${rz.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg)`;
+      it.el.style.opacity = clamp(2 - a, 0, 1).toFixed(3);
+      it.el.style.zIndex = Math.round(100 - a * 10);
+      it.shade.style.opacity = Math.max(0, dim).toFixed(3);
+      it.el.classList.toggle("is-side", a > 0.5);
+    }
+  }
+
+  function frame() {
+    const diff = target - pos;
+    if (Math.abs(diff) < 0.0008) { pos = target; render(); raf = 0; return; }
+    pos += diff * EASE;
+    render();
+    raf = requestAnimationFrame(frame);
+  }
+  function setTarget(t) {
+    target = LOOP ? t : clamp(t, 0, N - 1);
+    if (!raf) raf = requestAnimationFrame(frame);
+  }
+  function go(dir) { setTarget(Math.round(target) + dir); }
+
+  /* drag / swipe */
+  let down = false, moved = false, sx = 0, spos = 0, lastPos = 0, lastT = 0, vel = 0, suppressClick = false;
+  root.addEventListener("pointerdown", e => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    down = true; moved = false; sx = e.clientX; spos = pos; lastPos = pos; lastT = performance.now(); vel = 0;
+    if (raf) { cancelAnimationFrame(raf); raf = 0; }
+    target = pos;
+  });
+  root.addEventListener("pointermove", e => {
+    if (!down) return;
+    const dx = e.clientX - sx;
+    if (!moved && Math.abs(dx) > 6) {
+      moved = true; root.classList.add("is-drag");
+      try { root.setPointerCapture(e.pointerId); } catch (_) {}
+    }
+    if (!moved) return;
+    let p = spos - dx / (Cw * 0.9);
+    if (!LOOP) p = clamp(p, -0.35, N - 1 + 0.35);        // soft edge at the first/last card
+    pos = p; target = p;
+    const now = performance.now(), dt = now - lastT;
+    if (dt > 0) { vel = 0.8 * vel + 0.2 * ((pos - lastPos) / dt); lastPos = pos; lastT = now; }
+    render();
+  });
+  function endDrag() {
+    if (!down) return;
+    down = false; root.classList.remove("is-drag");
+    if (moved) {
+      suppressClick = true; setTimeout(() => (suppressClick = false), 0);
+      setTarget(Math.round(pos + clamp(vel * 220, -2, 2)));
+    }
+  }
+  root.addEventListener("pointerup", endDrag);
+  root.addEventListener("pointercancel", endDrag);
+
+  /* trackpad / wheel */
+  let lastWheel = 0;
+  root.addEventListener("wheel", e => {
+    const horiz = Math.abs(e.deltaX) > Math.abs(e.deltaY);
+    if (!horiz && !CONFIG.wheelVertical) return;            // normal page scroll stays untouched
+    const dir = (horiz ? e.deltaX : e.deltaY) > 0 ? 1 : -1;
+    const t = Math.round(target);
+    if (!LOOP && ((dir > 0 && t >= N - 1) || (dir < 0 && t <= 0))) return;   // at the end → let the page scroll
+    e.preventDefault();
+    const n = performance.now();
+    if (n - lastWheel < 380) return;
+    lastWheel = n; go(dir);
+  }, { passive: false });
+
+  /* keyboard */
+  root.addEventListener("keydown", e => {
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); go(1); }
+    if (e.key === "ArrowLeft"  || e.key === "ArrowUp")   { e.preventDefault(); go(-1); }
+  });
+
+  /* optional autoplay */
+  if (CONFIG.autoplay > 0 && !reduce) {
+    let hover = false;
+    root.addEventListener("mouseenter", () => (hover = true));
+    root.addEventListener("mouseleave", () => (hover = false));
+    setInterval(() => {
+      if (hover || down || document.hidden) return;
+      if (!LOOP && Math.round(target) >= N - 1) setTarget(0); else go(1);
+    }, CONFIG.autoplay);
+  }
+
+  /* image loading: exact file name first (jpg → png → jpeg → webp), then lower-case / Capitalised spelling */
+  function candidates(file) {
+    if (/\.(jpe?g|png|webp|avif|gif)$/i.test(file)) return [file];
+    const names = [file, file.toLowerCase(), file.charAt(0).toUpperCase() + file.slice(1)]
+      .filter((n, i, a) => a.indexOf(n) === i);
+    const out = [];
+    names.forEach(n => CONFIG.exts.forEach(e => out.push(n + "." + e)));
+    return out;
+  }
+  function loadSlide(i, k, list) {
+    list = list || candidates(SLIDES[i].file);
+    if (k >= list.length) { console.warn("Slant Deck: image not found →", CONFIG.folder + SLIDES[i].file); return; }
+    const url = CONFIG.folder + encodeURI(list[k]);
+    const im = new Image();
+    im.onload = () => { items[i].img.src = url; };
+    im.onerror = () => loadSlide(i, k + 1, list);
+    im.src = url;
+  }
+
+  /* init */
+  if ("ResizeObserver" in window) new ResizeObserver(measure).observe(root);
+  window.addEventListener("resize", measure);
+  measure();
+  SLIDES.forEach((_, i) => loadSlide(i, 0));
+})();
+/* ═════════════ SLANT DECK — JS END ═════════════ */
+</script>
+</body>
+</html>

@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Folder cards</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --page: #e8eaef;
+    --ease: cubic-bezier(.22, 1, .36, 1);
+    --dur: .7s;
+    --lift: 96px;            /* how far the panel slides down on hover */
+    --card-w: 253px;
+    --card-h: 338px;
+  }
+
+  * { box-sizing: border-box; margin: 0; }
+
+  body {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    background: var(--page);
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- Section ---------- */
+  .cards {
+    display: flex;
+    gap: 8px;
+    padding: 40px 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  /* ---------- Card ---------- */
+  .card {
+    --border: #06004a;
+    --panel: #050047;
+    --ink: #ffffff;
+    --muted: #9d99cc;
+
+    position: relative;
+    width: var(--card-w);
+    height: var(--card-h);
+    padding: 8px;
+    border-radius: 28px;
+    background: var(--border);
+    color: var(--ink);
+    text-decoration: none;
+    cursor: pointer;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .card--light {
+    --border: #c3cfdf;
+    --panel: #e3e6ee;
+    --ink: #15171c;
+    --muted: #5d6270;
+  }
+
+  .card--dark {
+    --border: #000;
+    --panel: #111a20;
+    --ink: #fff;
+    --muted: #8b949b;
+  }
+
+  .card:focus-visible { box-shadow: 0 0 0 3px var(--page), 0 0 0 5px #5b3ce0; }
+
+  .inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    border-radius: 21px;
+    isolation: isolate;
+  }
+
+  /* ---------- Artwork (sits behind the panel) ---------- */
+  .art {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    transform: scale(1.12);
+    transition: transform calc(var(--dur) * 1.2) var(--ease);
+  }
+  .art svg { width: 100%; height: 100%; display: block; }
+
+  /* ---------- Sliding panel ---------- */
+  .panel {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    top: 60px;                       /* idle: 60px of artwork peeks out above */
+    z-index: 1;
+    transition: transform var(--dur) var(--ease);
+  }
+
+  /* the little folder-tab on the top-left */
+  .panel::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0;
+    width: 100px; height: 27px;
+    background: var(--panel);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 27'%3E%3Cpath d='M0 27V12Q0 0 12 0H56C66 0 71 4 77 10C83 16 88 22 100 26.5V27Z'/%3E%3C/svg%3E") no-repeat center / 100% 100%;
+            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 27'%3E%3Cpath d='M0 27V12Q0 0 12 0H56C66 0 71 4 77 10C83 16 88 22 100 26.5V27Z'/%3E%3C/svg%3E") no-repeat center / 100% 100%;
+  }
+
+  .panel-body {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    top: 26px;
+    background: var(--panel);
+    border-top-right-radius: 16px;
+    padding: 0 18px;
+  }
+
+  .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding-top: 2px;
+  }
+
+  .num {
+    font-size: 46px;
+    font-weight: 400;
+    line-height: 1;
+    letter-spacing: -.02em;
+    margin-top: -6px;
+  }
+
+  .arrow {
+    width: 14px; height: 14px;
+    margin: 10px 4px 0 0;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform .4s var(--ease);
+  }
+
+  /* text stays put while the panel slides under it */
+  .text {
+    position: absolute;
+    left: 18px; right: 18px;
+    bottom: 18px;
+    transition: transform var(--dur) var(--ease);
+  }
+  .text h3 {
+    font-size: 13.5px;
+    font-weight: 600;
+    line-height: 1.25;
+    margin-bottom: 5px;
+  }
+  .text p {
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.3;
+    color: var(--muted);
+  }
+
+  /* ---------- Hover / focus / tap ---------- */
+  @media (hover: hover) {
+    .card:hover .panel,
+    .card:focus-visible .panel { transform: translateY(var(--lift)); }
+    .card:hover .text,
+    .card:focus-visible .text  { transform: translateY(calc(var(--lift) * -1)); }
+    .card:hover .art,
+    .card:focus-visible .art   { transform: scale(1); }
+    .card:hover .arrow         { transform: translate(2px, -2px); }
+  }
+  /* touch devices: tap to toggle (see script) */
+  .card.is-open .panel { transform: translateY(var(--lift)); }
+  .card.is-open .text  { transform: translateY(calc(var(--lift) * -1)); }
+  .card.is-open .art   { transform: scale(1); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .panel, .text, .art, .arrow { transition-duration: .01s; }
+  }
+
+  /* ---------- Narrow screens ---------- */
+  @media (max-width: 600px) {
+    :root { --card-w: min(100%, 340px); }
+    .cards { flex-direction: column; align-items: center; width: 100%; }
+  }
+
+  /* ---------- Click: card pulls out of the folder ---------- */
+  .card.is-picked .panel { transform: translateY(105%); transition-duration: .5s; }
+  .card.is-picked .text  { transform: none; }
+  .card.is-picked .art   { opacity: 0; }
+
+  .pop {
+    position: fixed; z-index: 50;
+    border-radius: 21px; overflow: hidden;
+    background: var(--border);
+    box-shadow: 0 40px 90px -20px rgba(0,0,0,.55), 0 0 0 8px var(--border);
+    transform-origin: 50% 100%;
+    cursor: pointer;
+    color: var(--ink);
+    will-change: left, top, width, height, transform;
+  }
+  .pop .art { transform: none; transition: none; }
+</style>
+</head>
+<body>
+
+<section class="cards" aria-label="Features">
+
+  <!-- 01 -->
+  <a class="card" href="#one">
+    <div class="inner">
+      <div class="art">
+        <!-- Replace this <svg> with <img src="your-image.jpg" alt=""> style="width:100%;height:100%;object-fit:cover" -->
+        <svg viewBox="0 0 237 322" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+          <defs>
+            <linearGradient id="bg1" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#7a50e6"/>
+              <stop offset=".45" stop-color="#2d12b8"/>
+              <stop offset="1" stop-color="#0a0270"/>
+            </linearGradient>
+            <linearGradient id="glass1" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#e9f4ff"/>
+              <stop offset=".25" stop-color="#5aa7ff"/>
+              <stop offset=".5" stop-color="#ff6a5c"/>
+              <stop offset=".75" stop-color="#6b5cff"/>
+              <stop offset="1" stop-color="#d9ecff"/>
+            </linearGradient>
+            <linearGradient id="inside1" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#6b3ff0"/>
+              <stop offset=".5" stop-color="#1a1aa8"/>
+              <stop offset="1" stop-color="#ff5d4d"/>
+            </linearGradient>
+            <filter id="grain1" x="0" y="0" width="100%" height="100%">
+              <feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="3"/>
+              <feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .22 0"/>
+            </filter>
+          </defs>
+          <rect width="237" height="322" fill="url(#bg1)"/>
+          <g transform="rotate(-8 120 120)">
+            <path d="M30 70 L205 40 L112 215 L100 140 Z" fill="url(#inside1)" stroke="url(#glass1)" stroke-width="9" stroke-linejoin="round"/>
+            <path d="M30 70 L205 40" stroke="#fff" stroke-opacity=".55" stroke-width="2" fill="none"/>
+          </g>
+          <rect width="237" height="322" filter="url(#grain1)"/>
+        </svg>
+      </div>
+      <div class="panel">
+        <div class="panel-body">
+          <div class="row">
+            <span class="num">01</span>
+            <svg class="arrow" viewBox="0 0 14 14"><path d="M3 11 11 3M5 3h6v6"/></svg>
+          </div>
+        </div>
+        <div class="text" style="bottom:18px">
+          <h3>Simple and easy to use</h3>
+          <p>Fully customize to suit your needs</p>
+        </div>
+      </div>
+    </div>
+  </a>
+
+  <!-- 02 -->
+  <a class="card card--light" href="#two">
+    <div class="inner">
+      <div class="art">
+        <svg viewBox="0 0 237 322" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+          <defs>
+            <linearGradient id="bg2" x1="0" y1="1" x2="1" y2="0">
+              <stop offset="0" stop-color="#ff9a1f"/>
+              <stop offset=".25" stop-color="#ff4a1c"/>
+              <stop offset=".45" stop-color="#e0201c"/>
+              <stop offset=".7" stop-color="#0d0d14"/>
+              <stop offset="1" stop-color="#2c2a66"/>
+            </linearGradient>
+            <filter id="grain2" x="0" y="0" width="100%" height="100%">
+              <feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="2" seed="8"/>
+              <feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .28 0"/>
+            </filter>
+            <!-- the 3D object revealed on hover -->
+            <linearGradient id="slab2" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#ff7a3d"/>
+              <stop offset=".5" stop-color="#c7152a"/>
+              <stop offset="1" stop-color="#2a1250"/>
+            </linearGradient>
+          </defs>
+          <rect width="237" height="322" fill="url(#bg2)"/>
+          <g transform="rotate(-14 120 110)" opacity=".95">
+            <rect x="20" y="40" width="130" height="62" rx="8" fill="url(#slab2)" stroke="#ffd2b0" stroke-opacity=".7" stroke-width="3"/>
+            <rect x="90" y="85" width="130" height="62" rx="8" fill="url(#slab2)" stroke="#ffd2b0" stroke-opacity=".7" stroke-width="3"/>
+          </g>
+          <rect width="237" height="322" filter="url(#grain2)"/>
+        </svg>
+      </div>
+      <div class="panel">
+        <div class="panel-body">
+          <div class="row">
+            <span class="num">02</span>
+            <svg class="arrow" viewBox="0 0 14 14"><path d="M3 11 11 3M5 3h6v6"/></svg>
+          </div>
+        </div>
+        <div class="text">
+          <h3 style="font-weight:500;font-size:14px">Number two for example</h3>
+          <p>The description of the second example is still easy to add</p>
+        </div>
+      </div>
+    </div>
+  </a>
+
+  <!-- 03 -->
+  <a class="card card--dark" href="#three">
+    <div class="inner">
+      <div class="art">
+        <svg viewBox="0 0 237 322" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+          <defs>
+            <radialGradient id="bg3" cx=".5" cy=".42" r=".7">
+              <stop offset="0" stop-color="#c9e2f5"/>
+              <stop offset=".45" stop-color="#6fa3cf"/>
+              <stop offset="1" stop-color="#05090c"/>
+            </radialGradient>
+            <linearGradient id="glass3" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#e8f4ff"/>
+              <stop offset=".4" stop-color="#5d9bd6"/>
+              <stop offset=".75" stop-color="#2a5d93"/>
+              <stop offset="1" stop-color="#d89a8c"/>
+            </linearGradient>
+            <filter id="grain3" x="0" y="0" width="100%" height="100%">
+              <feTurbulence type="fractalNoise" baseFrequency="1.3" numOctaves="2" seed="5"/>
+              <feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .35 0"/>
+            </filter>
+          </defs>
+          <rect width="237" height="322" fill="#030608"/>
+          <rect width="237" height="322" fill="url(#bg3)"/>
+          <g fill="url(#glass3)" stroke="#f2f9ff" stroke-opacity=".8" stroke-width="2.5" stroke-linejoin="round">
+            <path d="M120 30 Q175 25 195 70 L160 95 Q150 65 120 62 Z"/>
+            <path d="M20 70 Q70 45 105 85 L75 115 Q55 90 30 105 Z"/>
+            <path d="M110 110 Q165 95 190 135 L155 160 Q145 130 115 135 Z"/>
+          </g>
+          <rect width="237" height="322" filter="url(#grain3)"/>
+        </svg>
+      </div>
+      <div class="panel">
+        <div class="panel-body">
+          <div class="row">
+            <span class="num">03</span>
+            <svg class="arrow" viewBox="0 0 14 14"><path d="M3 11 11 3M5 3h6v6"/></svg>
+          </div>
+        </div>
+        <div class="text">
+          <h3>The third number, which shows ease of use</h3>
+          <p>This description needs to be made larger to show how easily the space can be filled.</p>
+        </div>
+      </div>
+    </div>
+  </a>
+
+</section>
+
+<script>
+(function () {
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var SPRING = 'cubic-bezier(.22, 1, .36, 1)';
+
+  var current = null; // { card, pop, panel }
+
+  function box(r) {
+    return { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' };
+  }
+  function finalBox() {
+    var w = Math.min(340, innerWidth - 32), h = Math.min(470, innerHeight - 40);
+    return { left: (innerWidth - w) / 2 + 'px', top: (innerHeight - h) / 2 + 'px', width: w + 'px', height: h + 'px' };
+  }
+  function dur(ms) { return reduce ? 1 : ms; }
+
+  function open(card) {
+    if (current) return;
+    var inner = card.querySelector('.inner');
+    var r = inner.getBoundingClientRect();
+    var cs = getComputedStyle(card);
+
+    var pop = document.createElement('div');
+    pop.className = 'pop';
+    pop.setAttribute('role', 'button');
+    pop.tabIndex = 0;
+    pop.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); close(); } });
+    ['--border', '--panel', '--ink', '--muted'].forEach(function (v) {
+      pop.style.setProperty(v, cs.getPropertyValue(v));
+    });
+    pop.setAttribute('aria-label', card.querySelector('h3').textContent + ' (click to close)');
+
+    pop.innerHTML = card.querySelector('.art').outerHTML;
+    pop.addEventListener('click', close);          // click the card again -> back to its place
+    document.body.appendChild(pop);
+
+    var f = finalBox();
+    Object.assign(pop.style, f);
+
+    card.classList.add('is-picked');          // folder drops away
+
+    // 1) slide up out of the folder with a tilt, 2) fly to centre and grow
+    var pulled = box({ left: r.left, top: r.top - 70, width: r.width, height: r.height });
+    pop.animate([
+      Object.assign(box(r),     { transform: 'rotate(0deg) scale(1)' }),
+      Object.assign(pulled,     { transform: 'rotate(-4deg) scale(1.03)', offset: .32 }),
+      Object.assign({}, f,      { transform: 'rotate(0deg) scale(1)' })
+    ], { duration: dur(900), easing: SPRING, fill: 'forwards' });
+
+    current = { card: card, pop: pop };
+    pop.focus({ preventScroll: true });
+  }
+
+  function close() {
+    if (!current) return;
+    var c = current; current = null;
+    var r = c.card.querySelector('.inner').getBoundingClientRect();
+    var f = finalBox();
+
+    var back = c.pop.animate([
+      Object.assign({}, f,  { transform: 'rotate(0deg) scale(1)' }),
+      Object.assign(box(r), { transform: 'rotate(0deg) scale(1)' })
+    ], { duration: dur(650), delay: dur(120), easing: SPRING, fill: 'forwards' });
+
+    back.onfinish = function () {
+      c.card.classList.remove('is-picked');   // folder slides back up over the card
+      c.pop.remove();
+      c.card.focus({ preventScroll: true });
+    };
+  }
+
+  document.querySelectorAll('.card').forEach(function (card) {
+    card.addEventListener('click', function (e) { e.preventDefault(); open(card); });
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+  addEventListener('resize', function () { if (current) Object.assign(current.pop.style, finalBox()); });
+})();
+</script>
+</body>
+</html>

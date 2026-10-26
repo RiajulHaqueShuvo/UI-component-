@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flick Pile – slider section</title>
+<style>
+  /* ── demo page only (তোমার সাইটে এই অংশ লাগবে না) ── */
+  html,body{margin:0;background:#0d0d0e;font-family:"Helvetica Neue",Arial,sans-serif}
+  .demo-strip{height:22vh;display:grid;place-items:center;color:#777;font-size:14px;letter-spacing:.08em;text-transform:uppercase}
+
+  /* ═════════════ FLICK PILE — CSS START ═════════════ */
+  .flp{
+    --h:700px;
+    position:relative; width:100%;
+    height:clamp(520px,56vw,820px);
+    overflow:hidden; background:#f0f0f0; color:#111;
+    font-family:"Inter","Helvetica Neue",Arial,sans-serif;
+    cursor:pointer; outline:none;
+    user-select:none; -webkit-user-select:none;
+    touch-action:pan-y;
+  }
+  .flp *{box-sizing:border-box}
+
+  /* giant tilted word in the background */
+  .flp-wm{
+    position:absolute; left:50%; top:50%; z-index:0; pointer-events:none;
+    transform:translate(-50%,-50%) rotate(-20deg);
+    font-family:"Arial Black","Helvetica Neue",Arial,sans-serif; font-weight:900;
+    font-size:calc(var(--h)*.62); line-height:1; letter-spacing:-.02em;
+    color:#e2e2e2; white-space:nowrap; text-transform:uppercase;
+  }
+
+  .flp-card{
+    position:absolute; left:0; top:0; z-index:1;
+    border-radius:3px; overflow:hidden; background:#1a1a1a;
+    box-shadow:0 8px 26px rgba(0,0,0,.22);
+    will-change:transform,opacity; transform-origin:50% 50%;
+  }
+  .flp-card img{
+    position:absolute; inset:0; width:100%; height:100%; display:block;
+    object-fit:cover; object-position:50% 30%;
+    pointer-events:none; -webkit-user-drag:none;
+  }
+  /* ═════════════ FLICK PILE — CSS END ═════════════ */
+</style>
+</head>
+<body>
+
+<div class="demo-strip">↓ your content above ↓</div>
+
+<!-- ═════════════ FLICK PILE — HTML START ═════════════ -->
+<section class="flp" id="flick-pile" tabindex="0" aria-roledescription="carousel" aria-label="Flick Pile gallery">
+  <div class="flp-wm" aria-hidden="true"></div>
+</section>
+<!-- ═════════════ FLICK PILE — HTML END ═════════════ -->
+
+<div class="demo-strip">↑ your content below ↑</div>
+
+<script>
+/* ═════════════ FLICK PILE — JS START ═════════════ */
+(function () {
+  /* ───────── ১) ছবি + লেখা সেটিং ───────── */
+  const CONFIG = {
+    folder: "assets/",                      // ছবির ফোল্ডার (HTML ফাইলের তুলনায়)
+    exts: ["jpg", "png", "jpeg", "webp"],   // jpg/png মিশে থাকলেও নিজে খুঁজে নেবে
+    loop: true,                             // true = শেষ কার্ডের পর আবার প্রথমটা আসে; false = শেষ কার্ডে থেমে যায়
+    ratio: 1.55,                            // কার্ডের উচ্চতা ÷ প্রস্থ (তোমার লম্বা ছবির জন্য ১.৫–১.৮)
+    pile: 4,                                // নিচে কয়টা কার্ডের কিনারা উঁকি দেবে
+    watermark: "Click",                     // পেছনের বিশাল লেখা (কম্পিউটারে)
+    watermarkTouch: "Tap",                  // পেছনের বিশাল লেখা (মোবাইল/টাচ স্ক্রিনে)
+    autoplay: 0                             // 0 = বন্ধ, 2500 = প্রতি ২.৫ সেকেন্ডে নিজে নিজে পরের কার্ড
+  };
+
+  /* file  : ছবির নাম (এক্সটেনশন ছাড়া)   title : ছবির alt লেখা   href : (ঐচ্ছিক) ক্লিকে যে পেজে যাবে */
+  const SLIDES = [
+    { file: "card_J", title: "Jack of Blades" },
+    { file: "Card2",  title: "Crimson Ronin" },
+    { file: "card3",  title: "Red Kanji" },
+    { file: "card4",  title: "Sakura Noir" },
+    { file: "card5",  title: "Blue Horizon" },
+    { file: "card6",  title: "Midnight Muse" },
+    { file: "card7",  title: "Ink Ember" },
+    { file: "card9",  title: "Card 09" },
+    { file: "card10", title: "Card 10" },
+    { file: "card11", title: "Card 11" }
+  ];
+  /* ───────── সেটিং শেষ ───────── */
+
+  const root = document.getElementById("flick-pile");
+  if (!root) return;
+  const wm = root.querySelector(".flp-wm");
+  const N = SLIDES.length;
+  const LOOP = CONFIG.loop && N >= 3;
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const touch = window.matchMedia("(pointer: coarse)").matches;
+  const EASE = reduce ? 1 : 0.1;                 // smaller = slower, floatier
+  const mod = (a, n) => ((a % n) + n) % n;
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  function rnd(seed) { let t = seed + 0x6D2B79F5; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }
+
+  wm.textContent = touch ? CONFIG.watermarkTouch : CONFIG.watermark;
+
+  /* build cards — each one keeps its own slightly-messy angle & offset while it sits in the pile */
+  const items = SLIDES.map((s, j) => {
+    const el = document.createElement(s.href ? "a" : "div");
+    el.className = "flp-card";
+    if (s.href) el.href = s.href;
+    el.innerHTML = `<img alt="${s.title}" draggable="false">`;
+    root.appendChild(el);
+    const sign = j % 2 ? 1 : -1;
+    return {
+      j, el, d: 0, img: el.querySelector("img"),
+      rot: sign * (2 + rnd(j * 3 + 1) * 3.2),     // 2°–5° either way, alternating
+      dx: (rnd(j * 3 + 2) - 0.5) * 16,
+      dy: (rnd(j * 3 + 3) - 0.5) * 14
+    };
+  });
+
+  /* measurements */
+  let W, H, Cw, Ch;
+  function measure() {
+    W = root.clientWidth; H = root.clientHeight;
+    if (W < 700) { Cw = W * 0.56; Ch = Cw * CONFIG.ratio; if (Ch > H * 0.8) { Ch = H * 0.8; Cw = Ch / CONFIG.ratio; } }
+    else         { Ch = H * 0.64; Cw = Ch / CONFIG.ratio; }
+    root.style.setProperty("--h", H + "px");
+    items.forEach(it => { it.el.style.width = Cw + "px"; it.el.style.height = Ch + "px"; });
+    render();
+  }
+
+  let pos = 0, target = 0, raf = 0;
+
+  function render() {
+    const cx = W / 2, cy = H / 2;
+    for (const it of items) {
+      /* d >= 0 : waiting in the pile (0 = top card) · -1 < d < 0 : being flicked away */
+      const d = LOOP ? mod(it.j - pos + 1, N) - 1 : it.j - pos;
+      it.d = d;
+      if (d <= -0.999 || d > CONFIG.pile + 1) { it.el.style.visibility = "hidden"; continue; }
+      it.el.style.visibility = "visible";
+
+      if (d >= 0) {
+        const m = Math.min(d, 1);                               // the next card straightens up as it reaches the top
+        it.el.style.transform =
+          `translate3d(${(cx - Cw / 2 + it.dx * m).toFixed(2)}px,${(cy - Ch / 2 + it.dy * m).toFixed(2)}px,0) rotate(${(it.rot * m).toFixed(2)}deg)`;
+        it.el.style.opacity = clamp(CONFIG.pile + 1 - d, 0, 1).toFixed(3);
+        it.el.style.zIndex = 1000 - Math.round(d * 10);
+      } else {
+        const t = -d, e = 1 - (1 - t) * (1 - t);                // fast start, soft landing
+        it.el.style.transform =
+          `translate3d(${(cx - Cw / 2 + e * Cw * 1.05).toFixed(2)}px,${(cy - Ch / 2 - e * Ch * 0.02).toFixed(2)}px,0) ` +
+          `perspective(1100px) rotateY(${(e * 66).toFixed(2)}deg) rotate(${(e * 5).toFixed(2)}deg)`;
+        it.el.style.opacity = Math.max(0, 1 - Math.pow(e, 2.2)).toFixed(3);   // fades out completely by the time it is gone
+        it.el.style.zIndex = 995;                                // slides out from under the new top card
+      }
+    }
+  }
+
+  function frame() {
+    const diff = target - pos;
+    if (Math.abs(diff) < 0.0008) { pos = target; render(); raf = 0; return; }
+    pos += diff * EASE;
+    render();
+    raf = requestAnimationFrame(frame);
+  }
+  function setTarget(t) {
+    target = LOOP ? t : clamp(t, 0, N - 1);
+    if (!raf) raf = requestAnimationFrame(frame);
+  }
+  const go = d => setTarget(Math.round(target) + d);
+
+  /* click / tap = flick the top card away.  swipe left = next, swipe right = back */
+  let sx = 0, sy = 0, swiped = false;
+  root.addEventListener("pointerdown", e => { sx = e.clientX; sy = e.clientY; swiped = false; });
+  root.addEventListener("pointerup", e => {
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.4) { swiped = true; go(dx < 0 ? 1 : -1); }
+  });
+  root.addEventListener("click", e => {
+    if (swiped) { swiped = false; e.preventDefault(); return; }
+    const a = e.target.closest && e.target.closest("a[href]");
+    if (a && Math.abs(items.find(i => i.el === a).d) < 0.5) return;       // top card with a link → open it
+    go(1);
+  });
+  root.addEventListener("keydown", e => {
+    if (e.key === "ArrowRight" || e.key === " " || e.key === "Enter") { e.preventDefault(); go(1); }
+    if (e.key === "ArrowLeft") { e.preventDefault(); go(-1); }
+  });
+
+  /* optional autoplay */
+  if (CONFIG.autoplay > 0 && !reduce) {
+    let hover = false;
+    root.addEventListener("mouseenter", () => (hover = true));
+    root.addEventListener("mouseleave", () => (hover = false));
+    setInterval(() => { if (!hover && !document.hidden) { if (!LOOP && Math.round(target) >= N - 1) setTarget(0); else go(1); } }, CONFIG.autoplay);
+  }
+
+  /* image loading: exact name first (jpg → png → jpeg → webp), then lower-case / Capitalised spelling */
+  function candidates(file) {
+    if (/\.(jpe?g|png|webp|avif|gif)$/i.test(file)) return [file];
+    const names = [file, file.toLowerCase(), file.charAt(0).toUpperCase() + file.slice(1)].filter((n, i, a) => a.indexOf(n) === i);
+    const out = [];
+    names.forEach(n => CONFIG.exts.forEach(e => out.push(n + "." + e)));
+    return out;
+  }
+  function loadSlide(i, k, list) {
+    list = list || candidates(SLIDES[i].file);
+    if (k >= list.length) { console.warn("Flick Pile: image not found →", CONFIG.folder + SLIDES[i].file); return; }
+    const url = CONFIG.folder + encodeURI(list[k]);
+    const im = new Image();
+    im.onload = () => { items[i].img.src = url; };
+    im.onerror = () => loadSlide(i, k + 1, list);
+    im.src = url;
+  }
+
+  /* init */
+  if ("ResizeObserver" in window) new ResizeObserver(measure).observe(root);
+  window.addEventListener("resize", measure);
+  measure();
+  SLIDES.forEach((_, i) => loadSlide(i, 0));
+})();
+/* ═════════════ FLICK PILE — JS END ═════════════ */
+</script>
+</body>
+</html>
