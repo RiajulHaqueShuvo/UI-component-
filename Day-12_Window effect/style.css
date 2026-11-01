@@ -1,0 +1,105 @@
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: #000;
+}
+
+.blinds {
+  --dur: 650ms;
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+/* full-size base image */
+.blinds__layer {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+}
+
+.blinds__strips {
+  position: absolute;
+  inset: 0;
+}
+
+/* one horizontal blind: starts collapsed to a line at its own centre */
+.blinds__strip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  overflow: hidden;
+  clip-path: inset(50% 0 50% 0);
+  transition: clip-path var(--dur) cubic-bezier(0.76, 0, 0.24, 1);
+  will-change: clip-path;
+}
+
+/* each strip shows only its own slice of the full image */
+.blinds__strip-img {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background-size: cover;
+  background-position: center;
+}
+
+/* open every blind (each has its own transition-delay set in JS) */
+.blinds.is-running .blinds__strip {
+  clip-path: inset(0 0 0 0);
+}
+
+/* ---------- UI ---------- */
+.blinds__nav,
+.blinds__label {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #fff;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.55);
+  z-index: 5;
+}
+
+.blinds__nav {
+  background: none;
+  border: 0;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  opacity: 0.9;
+  transition: opacity 0.2s;
+  font-family: inherit;
+}
+.blinds__nav:hover { opacity: 1; }
+.blinds__nav--left  { left: 1rem; }
+.blinds__nav--right { right: 1rem; }
+
+.blinds__label {
+  left: 50%;
+  translate: -50% 0;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* JS adds this class each time the text changes */
+.blinds__label.is-changing {
+  animation: label-in 0.5s ease both;
+}
+
+@keyframes label-in {
+  from { opacity: 0; filter: blur(6px); margin-top: 10px; }
+  to   { opacity: 1; filter: blur(0);   margin-top: 0; }
+}
+
+@media (max-width: 600px) {
+  .blinds__nav, .blinds__label { font-size: 1rem; }
+}

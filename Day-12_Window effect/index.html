@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Blinds Slider</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <section class="blinds" id="blinds">
+    <!-- base image (current slide) -->
+    <div class="blinds__layer" id="base"></div>
+
+    <!-- strips for the incoming image are injected here by script.js -->
+    <div class="blinds__strips" id="strips"></div>
+
+    <button class="blinds__nav blinds__nav--left" id="prev">Featured</button>
+    <h2 class="blinds__label" id="label"></h2>
+    <button class="blinds__nav blinds__nav--right" id="next">Explore</button>
+  </section>
+
+  <script src="script.js"></script>
+</body>
+</html>
