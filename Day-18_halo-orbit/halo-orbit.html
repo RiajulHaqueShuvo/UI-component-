@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Halo Orbit – slider section</title>
+<style>
+  /* ── demo page only (তোমার সাইটে এই অংশ লাগবে না) ── */
+  html,body{margin:0;background:#cfcfd2;font-family:"Helvetica Neue",Arial,sans-serif}
+  .demo-strip{height:22vh;display:grid;place-items:center;color:#777;font-size:14px;letter-spacing:.08em;text-transform:uppercase}
+
+  /* ═════════════ HALO ORBIT — CSS START ═════════════ */
+  .hlo{
+    position:relative; width:100%;
+    height:clamp(520px,66vw,860px);
+    overflow:hidden; background:#ebebeb; color:#111;
+    font-family:"Inter","Helvetica Neue",Arial,sans-serif;
+    cursor:grab; outline:none;
+    user-select:none; -webkit-user-select:none;
+    touch-action:pan-y;
+  }
+  .hlo *{box-sizing:border-box}
+  .hlo.is-drag{cursor:grabbing}
+
+  .hlo-card{
+    position:absolute; left:0; top:0; overflow:hidden;
+    background:#d9d9dd; cursor:pointer;
+    transform-origin:50% 50%; will-change:transform;
+  }
+  .hlo-card img,.hlo-card video{
+    position:absolute; inset:0; width:100%; height:100%; display:block;
+    object-fit:cover; object-position:50% 30%;
+    pointer-events:none; -webkit-user-drag:none;
+  }
+  .hlo-card img:not([src]){display:none}
+  .hlo-card video{opacity:0;transition:opacity .45s ease}
+  .hlo-card video.is-ready{opacity:1}
+  /* ═════════════ HALO ORBIT — CSS END ═════════════ */
+</style>
+</head>
+<body>
+
+<div class="demo-strip">↓ your content above ↓</div>
+
+<!-- ═════════════ HALO ORBIT — HTML START ═════════════ -->
+<section class="hlo" id="halo-orbit" tabindex="0" aria-roledescription="carousel" aria-label="Halo Orbit gallery"></section>
+<!-- ═════════════ HALO ORBIT — HTML END ═════════════ -->
+
+<div class="demo-strip">↑ your content below ↑</div>
+
+<script>
+/* ═════════════ HALO ORBIT — JS START ═════════════ */
+(function () {
+  /* ───────── ১) সেটিং ───────── */
+  const CONFIG = {
+    folder: "assets/",                      // ছবি/ভিডিওর ফোল্ডার (HTML ফাইলের তুলনায়)
+    exts: ["jpg", "png", "jpeg", "webp"],   // ছবি: jpg/png মিশে থাকলেও নিজে খুঁজে নেবে
+    videoExts: ["mp4", "webm", "mov", "m4v", "ogv"],   // ভিডিও: কোন ফরম্যাট তা নিজে খুঁজে নেবে
+    ratio: 1.3,                             // কার্ডের উচ্চতা ÷ প্রস্থ (ভিডিওতে 1 = বর্গ; তোমার লম্বা ছবির জন্য 1.3–1.6)
+    autoSpin: 6,                            // নিজে নিজে ঘোরার গতি (ডিগ্রি/সেকেন্ড, ঘড়ির কাঁটার দিকে) — 0 = থেমে থাকবে
+    wheel: false                            // true দিলে মাউস-হুইলে রিং ঘুরবে (পেজ স্ক্রল আটকে যায়, তাই বন্ধ রাখা ভালো)
+  };
+
+  /* প্রতিটা কার্ড ছবি বা ভিডিও:
+       image : ছবির নাম (jpg/png নিজে খুঁজে নেবে; একই নামের দুটো ছবি হলে card9.jpg / card9.png এভাবে এক্সটেনশন সহ লেখো)
+       video : ভিডিওর নাম, এক্সটেনশন ছাড়া (mp4/webm/mov নিজে খুঁজে নেবে) — অথবা পুরো লিংক "https://..."
+               ভিডিও কার্ড সামনের দিকে এলে চুপচাপ লুপে চলে
+       title : ছবির alt লেখা     href : (ঐচ্ছিক) সামনের কার্ডে ক্লিকে যে পেজে যাবে */
+  const SLIDES = [
+    { image: "card_J",    title: "Jack of Blades" },
+    { image: "Card2",     title: "Crimson Ronin" },
+    { image: "card3",     title: "Red Kanji" },
+    { image: "card4",     title: "Sakura Noir" },
+    { image: "card5",     title: "Blue Horizon" },
+    { image: "card6",     title: "Midnight Muse" },
+    { image: "card7",     title: "Ink Ember" },
+    { image: "card8",     title: "Scarlet Duelist" },
+    { image: "card9.jpg", title: "Still Water" },
+    { image: "card9.png", title: "Library Ember" },
+    { image: "card10",    title: "Straw Hat Ronin" },
+    { image: "card11",    title: "Noir Chapter" }
+    /* ভিডিও যোগ করতে চাইলে এই লাইনগুলোর // তুলে দাও (ফাইলগুলো assets ফোল্ডারে থাকতে হবে):
+    , { video: "video",   title: "Grey Rain" }
+    , { video: "video_1", title: "Sigil Awakening" }
+    , { video: "video_2", title: "Red Moon Oath" }
+    , { video: "video_3", title: "Crimson Dusk" }
+    */
+  ];
+  /* ───────── সেটিং শেষ ───────── */
+
+  const root = document.getElementById("halo-orbit");
+  if (!root) return;
+  const N = SLIDES.length, STEP = 360 / N;
+  const TH0 = -12;                               // the biggest card sits just above the 3 o'clock position
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const wrap = a => ((a + 540) % 360) - 180;     // → (-180, 180]
+  const D2R = Math.PI / 180;
+
+  /* video: a full link is used as-is; a bare name gets <source> tags for each format */
+  const MIME = { mp4: "video/mp4", webm: "video/webm", mov: "video/quicktime", m4v: "video/mp4", ogv: "video/ogg" };
+  function setVideoSource(vid, name) {
+    if (/^(https?:)?\/\//i.test(name) || /\.(mp4|webm|mov|m4v|ogv)$/i.test(name)) {
+      vid.src = /^(https?:)?\/\//i.test(name) ? name : CONFIG.folder + encodeURI(name);
+      return;
+    }
+    CONFIG.videoExts.forEach(ext => {
+      const s = document.createElement("source");
+      s.src = CONFIG.folder + encodeURI(name + "." + ext); s.type = MIME[ext] || "";
+      vid.appendChild(s);
+    });
+    vid.load();
+  }
+
+  /* ---------- build cards ---------- */
+  const items = SLIDES.map((s, j) => {
+    const el = document.createElement(s.href ? "a" : "div");
+    el.className = "hlo-card";
+    if (s.href) el.href = s.href;
+    el.innerHTML = s.video ? '<video muted loop playsinline preload="metadata"></video>' : `<img alt="${s.title || ""}" draggable="false">`;
+    root.appendChild(el);
+    const it = { j, el, delta: 0, img: el.querySelector("img"), vid: el.querySelector("video"), playing: false };
+    if (it.vid) {
+      it.vid.muted = true; it.vid.loop = true; it.vid.playsInline = true;
+      it.vid.addEventListener("loadeddata", () => it.vid.classList.add("is-ready"));
+      setVideoSource(it.vid, s.video);
+    }
+    el.addEventListener("click", e => {
+      if (suppressClick) { e.preventDefault(); return; }
+      if (Math.abs(it.delta) > 25) { e.preventDefault(); focusCard(it.j); }       // not in front yet → spin it to the front
+    });
+    return it;
+  });
+
+  /* ---------- layout (proportions taken from the original 1100×818 design) ---------- */
+  let W, H, R, smax, smin, cx, cy, ch;
+  function measure() {
+    W = root.clientWidth; H = root.clientHeight;
+    R = Math.min(H * 0.4, W * 0.39);
+    smax = R * 0.52; smin = R * 0.12;
+    cx = W * 0.49; cy = H * 0.5; ch = smax * CONFIG.ratio;
+    items.forEach(it => { it.el.style.width = smax.toFixed(1) + "px"; it.el.style.height = ch.toFixed(1) + "px"; });
+    render();
+  }
+
+  let rot = 0, vel = 0, tweenTo = null, dragging = false;
+
+  function render() {
+    for (const it of items) {
+      const th = rot + it.j * STEP;                            // angle on the ring, clockwise from 3 o'clock
+      const x = cx + R * Math.cos(th * D2R), y = cy + R * Math.sin(th * D2R);
+      const delta = wrap(th - TH0); it.delta = delta;
+      const t = (1 + Math.cos(delta * D2R)) / 2;               // 1 = front (right side), 0 = far (left side)
+      const size = smin + (smax - smin) * t * t;
+      it.el.style.transform = `translate3d(${(x - smax / 2).toFixed(2)}px,${(y - ch / 2).toFixed(2)}px,0) scale(${(size / smax).toFixed(4)})`;
+      it.el.style.zIndex = Math.round(size * 10);
+      if (it.vid && !reduce) {                                  // only video cards facing us play
+        const want = Math.abs(delta) < 34;
+        if (want !== it.playing) { it.playing = want; if (want) { const p = it.vid.play(); if (p && p.catch) p.catch(() => {}); } else it.vid.pause(); }
+      }
+    }
+  }
+
+  /* ---------- animation loop ---------- */
+  let raf = 0, last = 0, inView = true;
+  function tick(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (!dragging) {
+      if (tweenTo !== null) {
+        rot += (tweenTo - rot) * Math.min(1, dt * 6);
+        if (Math.abs(tweenTo - rot) < 0.02) { rot = tweenTo; tweenTo = null; }
+      } else {
+        rot += ((reduce ? 0 : CONFIG.autoSpin) + vel) * dt;
+        vel *= Math.exp(-dt * 2.4);
+        if (Math.abs(vel) < 0.05) vel = 0;
+      }
+    }
+    render();
+    raf = requestAnimationFrame(tick);
+  }
+  function start() { if (!raf && inView && !document.hidden) { last = performance.now(); raf = requestAnimationFrame(tick); } }
+  function stop() { cancelAnimationFrame(raf); raf = 0; items.forEach(it => { if (it.vid) { it.vid.pause(); it.playing = false; } }); }
+  if ("IntersectionObserver" in window) new IntersectionObserver(en => { inView = en[0].isIntersecting; inView ? start() : stop(); }).observe(root);
+  document.addEventListener("visibilitychange", () => (document.hidden ? stop() : start()));
+
+  /* spin the chosen card to the front by the shortest way round */
+  function focusCard(j) { const want = TH0 - j * STEP; tweenTo = rot + wrap(want - rot); vel = 0; }
+
+  /* ---------- drag: grab the ring and turn it ---------- */
+  let sx = 0, sy = 0, moved = false, lastA = 0, lastT = 0, suppressClick = false;
+  const angleAt = e => { const r = root.getBoundingClientRect(); return Math.atan2(e.clientY - r.top - cy, e.clientX - r.left - cx) / D2R; };
+  root.addEventListener("pointerdown", e => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    dragging = true; moved = false; sx = e.clientX; sy = e.clientY; lastA = angleAt(e); lastT = performance.now(); vel = 0; tweenTo = null;
+  });
+  root.addEventListener("pointermove", e => {
+    if (!dragging) return;
+    if (!moved && Math.hypot(e.clientX - sx, e.clientY - sy) > 5) { moved = true; root.classList.add("is-drag"); try { root.setPointerCapture(e.pointerId); } catch (_) {} lastA = angleAt(e); }
+    if (!moved) return;
+    const a = angleAt(e), d = wrap(a - lastA), now = performance.now(), dt = Math.max(1, now - lastT);
+    rot += d; vel = 0.7 * vel + 0.3 * (d / dt * 1000);
+    lastA = a; lastT = now;
+  });
+  function endDrag() {
+    if (!dragging) return;
+    dragging = false; root.classList.remove("is-drag");
+    vel = clamp(vel, -420, 420);
+    if (moved) { suppressClick = true; setTimeout(() => (suppressClick = false), 0); }
+  }
+  root.addEventListener("pointerup", endDrag);
+  root.addEventListener("pointercancel", endDrag);
+
+  /* ---------- wheel / keyboard ---------- */
+  root.addEventListener("wheel", e => {
+    const horiz = Math.abs(e.deltaX) > Math.abs(e.deltaY);
+    if (!horiz && !CONFIG.wheel) return;                        // normal page scroll stays untouched
+    e.preventDefault(); tweenTo = null;
+    vel = clamp(vel + (horiz ? e.deltaX : e.deltaY) * 0.6, -420, 420);
+  }, { passive: false });
+  root.addEventListener("keydown", e => {
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); tweenTo = (tweenTo === null ? rot : tweenTo) - STEP; }
+    if (e.key === "ArrowLeft"  || e.key === "ArrowUp")   { e.preventDefault(); tweenTo = (tweenTo === null ? rot : tweenTo) + STEP; }
+  });
+
+  /* ---------- images: exact name first (jpg → png → jpeg → webp), then lower-case / Capitalised ---------- */
+  function candidates(name) {
+    if (/^(https?:)?\/\//i.test(name)) return [name];
+    if (/\.(jpe?g|png|webp|avif|gif)$/i.test(name)) return [CONFIG.folder + encodeURI(name)];
+    const names = [name, name.toLowerCase(), name.charAt(0).toUpperCase() + name.slice(1)].filter((n, i, a) => a.indexOf(n) === i);
+    const out = [];
+    names.forEach(n => CONFIG.exts.forEach(e => out.push(CONFIG.folder + encodeURI(n + "." + e))));
+    return out;
+  }
+  function loadImage(i, k, list) {
+    list = list || candidates(SLIDES[i].image);
+    if (k >= list.length) { console.warn("Halo Orbit: image not found →", SLIDES[i].image); return; }
+    const im = new Image();
+    im.onload = () => { items[i].img.src = list[k]; };
+    im.onerror = () => loadImage(i, k + 1, list);
+    im.src = list[k];
+  }
+  SLIDES.forEach((s, i) => { if (s.image) loadImage(i, 0); });
+
+  /* ---------- init ---------- */
+  if ("ResizeObserver" in window) new ResizeObserver(measure).observe(root);
+  window.addEventListener("resize", measure);
+  measure(); start();
+})();
+/* ═════════════ HALO ORBIT — JS END ═════════════ */
+</script>
+</body>
+</html>

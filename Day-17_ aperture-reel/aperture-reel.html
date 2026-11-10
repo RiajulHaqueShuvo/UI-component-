@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aperture Reel – slider section</title>
+<style>
+  /* ── demo page only (তোমার সাইটে এই অংশ লাগবে না) ── */
+  html,body{margin:0;background:#f4f4f5;font-family:"Helvetica Neue",Arial,sans-serif}
+  .demo-strip{height:22vh;display:grid;place-items:center;color:#999;font-size:14px;letter-spacing:.08em;text-transform:uppercase}
+
+  /* ═════════════ APERTURE REEL — CSS START ═════════════ */
+  .apr{
+    --s:1;
+    position:relative; width:100%;
+    height:clamp(520px,56vw,820px);
+    overflow:hidden; background:#fff; color:#111;
+    font-family:"Inter","Helvetica Neue",Arial,sans-serif;
+    cursor:grab; outline:none;
+    user-select:none; -webkit-user-select:none;
+    touch-action:pan-y;
+  }
+  .apr *{box-sizing:border-box}
+  .apr.is-drag{cursor:grabbing}
+
+  .apr-card{
+    position:absolute; left:0; top:0; overflow:hidden;
+    background:#e9e9ee; cursor:pointer;
+    will-change:transform,width,height,opacity;
+  }
+  .apr-card.is-active{box-shadow:0 18px 44px rgba(0,0,0,.18)}
+
+  /* picture or video fills the card */
+  .apr-media{position:absolute;inset:0}
+  .apr-media img,.apr-media video{
+    position:absolute; inset:0; width:100%; height:100%; display:block;
+    object-fit:cover; object-position:50% 30%;
+    pointer-events:none; -webkit-user-drag:none;
+  }
+  .apr-media img:not([src]){display:none}
+  .apr-media video{opacity:0;transition:opacity .45s ease}
+  .apr-media video.is-ready{opacity:1}
+
+  /* title + text, only on the front card */
+  .apr-shade{position:absolute;left:0;right:0;bottom:0;height:48%;background:linear-gradient(to top,rgba(0,0,0,.7),rgba(0,0,0,0));opacity:0;pointer-events:none}
+  .apr-cap{position:absolute;left:calc(18px*var(--s));right:calc(18px*var(--s));bottom:calc(18px*var(--s));color:#fff;opacity:0;pointer-events:none}
+  .apr-cap b{display:block;font-weight:500;letter-spacing:.005em;font-size:max(13px,calc(17px*var(--s)))}
+  .apr-cap span{display:block;margin-top:calc(5px*var(--s));font-size:max(11px,calc(12.5px*var(--s)));line-height:1.35;opacity:.84}
+  /* small camera badge on video cards */
+  .apr-badge{
+    position:absolute; top:calc(12px*var(--s)); right:calc(12px*var(--s));
+    width:calc(28px*var(--s)); height:calc(28px*var(--s)); min-width:22px; min-height:22px;
+    border-radius:50%; background:rgba(20,20,20,.4);
+    -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px);
+    display:grid; place-items:center; color:#fff; opacity:0; pointer-events:none;
+  }
+  .apr-badge svg{width:56%;height:56%}
+
+  /* page dots */
+  .apr-dots{position:absolute;left:0;right:0;display:flex;justify-content:center;align-items:center;gap:7px;pointer-events:none}
+  .apr-dots i{width:6px;height:6px;border-radius:3px;background:#d6d6db;transition:width .35s ease,background .35s ease}
+  .apr-dots i.on{width:20px;background:#111}
+  /* ═════════════ APERTURE REEL — CSS END ═════════════ */
+</style>
+</head>
+<body>
+
+<div class="demo-strip">↓ your content above ↓</div>
+
+<!-- ═════════════ APERTURE REEL — HTML START ═════════════ -->
+<section class="apr" id="aperture-reel" tabindex="0" aria-roledescription="carousel" aria-label="Aperture Reel gallery">
+  <div class="apr-dots"></div>
+</section>
+<!-- ═════════════ APERTURE REEL — HTML END ═════════════ -->
+
+<div class="demo-strip">↑ your content below ↑</div>
+
+<script>
+/* ═════════════ APERTURE REEL — JS START ═════════════ */
+(function () {
+  /* ───────── ১) সেটিং ───────── */
+  const CONFIG = {
+    folder: "assets/",                      // ছবির ফোল্ডার (HTML ফাইলের তুলনায়)
+    exts: ["jpg", "png", "jpeg", "webp"],   // ছবি: jpg/png মিশে থাকলেও নিজে খুঁজে নেবে
+    videoExts: ["mp4", "webm", "mov", "m4v", "ogv"],   // ভিডিও: কোন ফরম্যাট তা নিজে খুঁজে নেবে
+    ratio: 1.45,                            // কার্ডের উচ্চতা ÷ প্রস্থ
+    autoplay: 5000,                         // কত মিলিসেকেন্ড পরপর নিজে নিজে পরের কার্ড (0 = বন্ধ)
+    wheelVertical: false                    // true দিলে মাউস-হুইলের ওপর/নিচ স্ক্রলেও কার্ড বদলাবে
+  };
+
+  /* প্রতিটা কার্ড ছবি বা ভিডিও — যেটা দরকার সেটা দাও:
+       image : ছবির নাম (assets ফোল্ডার থেকে নেবে; jpg/png নিজে খুঁজে নেবে)
+               দুটো ছবির নাম একই হলে (যেমন card9.jpg আর card9.png) এক্সটেনশন সহ লেখো
+       video : ভিডিওর নাম, এক্সটেনশন ছাড়া (mp4/webm/mov নিজে খুঁজে নেবে) — অথবা পুরো লিংক "https://..."
+               সামনে এলে চুপচাপ লুপে চলবে
+       start : (ঐচ্ছিক) ভিডিও কত সেকেন্ড থেকে শুরু হবে
+       দুটোই দিলে ভিডিও লোড না হওয়া পর্যন্ত ছবি দেখাবে (poster হিসেবে)
+       title / text : সামনের কার্ডের নিচের লেখা       href : (ঐচ্ছিক) সামনের কার্ডে ক্লিকে যে পেজে যাবে */
+  const SLIDES = [
+    { image: "card_J",    title: "Jack of Blades",   text: "Playing-card samurai in bold ink and colour" },
+    { image: "Card2",     title: "Crimson Ronin",    text: "A wandering swordswoman in ornate red armour" },
+    { video: "video",     title: "Grey Rain",        text: "A lone warrior standing in the falling rain" },
+    { image: "card3",     title: "Red Kanji",        text: "Black and red steel under a poster of kanji" },
+    { image: "card4",     title: "Sakura Noir",      text: "Pink-haired rebel on a manga-page backdrop" },
+    { video: "video_1",   title: "Sigil Awakening",  text: "Power gathers inside a glowing golden circle" },
+    { image: "card5",     title: "Blue Horizon",     text: "Arms raised against a clear blue sky" },
+    { image: "card6",     title: "Midnight Muse",    text: "Quiet monochrome mood in soft grey light" },
+    { video: "video_2",   title: "Red Moon Oath",    text: "A blade and a promise under a crimson moon" },
+    { image: "card7",     title: "Ink Ember",        text: "Fiery hair framed by a splash of black ink" },
+    { image: "card8",     title: "Scarlet Duelist",  text: "A red cape sweeping across a pale battlefield" },
+    { video: "video_3",   title: "Crimson Dusk",     text: "A silhouette and crows against a burning sky" },
+    { image: "card9.jpg", title: "Still Water",      text: "A swordsman kneeling in a mirror of mist" },
+    { image: "card9.png", title: "Library Ember",    text: "Red hair against shelves of old books" },
+    { image: "card10",    title: "Straw Hat Ronin",  text: "A blade-bearer beneath glowing red gates" },
+    { image: "card11",    title: "Noir Chapter",     text: "A dark manga page of shadow and ink" }
+  ];
+  /* ───────── সেটিং শেষ ───────── */
+
+  const root = document.getElementById("aperture-reel");
+  if (!root) return;
+  const dotsEl = root.querySelector(".apr-dots");
+  const N = SLIDES.length;
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const EASE = reduce ? 1 : 0.09;               // smaller = slower, floatier
+  const F1 = 0.35, DECAY = 0.72;                // size of the next card (÷ front card) and how fast the rest shrink
+  const mod = (a, n) => ((a % n) + n) % n;
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const smooth = t => t * t * (3 - 2 * t);
+  const CAM = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="13" height="12" rx="3"/><path d="M15 10.5 21 7v10l-6-3.5"/></svg>';
+
+  /* video: a full link is used as-is; a bare name gets <source> tags for each format — the browser plays the first one that exists */
+  const MIME = { mp4: "video/mp4", webm: "video/webm", mov: "video/quicktime", m4v: "video/mp4", ogv: "video/ogg" };
+  function setVideoSource(vid, name) {
+    if (/^(https?:)?\/\//i.test(name) || /\.(mp4|webm|mov|m4v|ogv)$/i.test(name)) {
+      vid.src = /^(https?:)?\/\//i.test(name) ? name : CONFIG.folder + encodeURI(name);
+      return;
+    }
+    CONFIG.videoExts.forEach(ext => {
+      const src = document.createElement("source");
+      src.src = CONFIG.folder + encodeURI(name + "." + ext);
+      src.type = MIME[ext] || "";
+      vid.appendChild(src);
+    });
+    vid.load();
+  }
+
+  /* ---------- build cards ---------- */
+  const items = SLIDES.map((s, j) => {
+    const el = document.createElement(s.href ? "a" : "div");
+    el.className = "apr-card";
+    if (s.href) el.href = s.href;
+    el.innerHTML =
+      `<div class="apr-media">${s.image ? `<img alt="${s.title}" draggable="false">` : ""}${s.video ? '<video muted loop playsinline preload="metadata"></video>' : ""}</div>` +
+      '<div class="apr-shade"></div>' +
+      `<div class="apr-cap"><b>${s.title}</b><span>${s.text || ""}</span></div>` +
+      (s.video ? `<div class="apr-badge">${CAM}</div>` : "");
+    root.insertBefore(el, dotsEl);
+    const it = {
+      j, el, d: 0,
+      img: el.querySelector("img"), vid: el.querySelector("video"),
+      shade: el.querySelector(".apr-shade"), cap: el.querySelector(".apr-cap"), badge: el.querySelector(".apr-badge")
+    };
+    if (it.vid) {
+      it.vid.muted = true; it.vid.loop = true; it.vid.playsInline = true;
+      it.vid.addEventListener("loadedmetadata", () => { try { it.vid.currentTime = s.start || 0; } catch (_) {} }, { once: true });
+      it.vid.addEventListener("loadeddata", () => it.vid.classList.add("is-ready"));
+      setVideoSource(it.vid, s.video);
+    }
+    el.addEventListener("click", e => {
+      if (suppressClick) { e.preventDefault(); return; }
+      if (Math.abs(it.d) > 0.5) { e.preventDefault(); setTarget(Math.round(pos + it.d)); arm(); }   // side card → bring to front
+    });
+    return it;
+  });
+  const dots = SLIDES.map(() => dotsEl.appendChild(document.createElement("i")));
+
+  /* ---------- layout ---------- */
+  let W, H, S, Wa, Ha, gap, cy;
+  function measure() {
+    W = root.clientWidth; H = root.clientHeight;
+    if (W < 700) { Wa = W * 0.56; Ha = Wa * CONFIG.ratio; if (Ha > H * 0.78) { Ha = H * 0.78; Wa = Ha / CONFIG.ratio; } }
+    else         { Ha = H * 0.74; Wa = Ha / CONFIG.ratio; }
+    S = Wa / 374;                                // everything scales from the original 1316-wide design
+    gap = 4 * S; cy = H * 0.5;
+    root.style.setProperty("--s", S.toFixed(3));
+    dotsEl.style.top = (cy + Ha / 2 + 20 * Math.max(S, .6)) + "px";
+    render();
+  }
+
+  let pos = 0, target = 0, raf = 0;
+
+  function render() {
+    for (const it of items) it.d = mod(it.j - pos + N / 2, N) - N / 2;
+    const sorted = items.slice().sort((a, b) => a.d - b.d);
+
+    let x = 0, ia = 0;
+    sorted.forEach((it, k) => {
+      const a = Math.abs(it.d);
+      const f = a <= 1 ? 1 - (1 - F1) * smooth(a) : F1 * Math.pow(DECAY, a - 1);   // front card big, others shrink with distance
+      const u = clamp(1 - a, 0, 1);
+      it.w = u * u * (3 - 2 * u);                          // 1 = front card
+      it.cw = Wa * f; it.ch = it.cw * CONFIG.ratio;
+      it.L = x; x += it.cw + gap;
+      if (it.d <= 0) ia = k;
+    });
+    const a0 = sorted[ia], n0 = sorted[ia + 1] || a0;
+    const ref = a0.L + (-a0.d) * (n0.L - a0.L);            // keeps the front card centred
+    const left = W / 2 - Wa / 2;
+
+    for (const it of sorted) {
+      const px = left + it.L - ref, a = Math.abs(it.d);
+      const off = px + it.cw < -20 || px > W + 20 || a > N / 2 - 0.01 && N < 8;
+      it.el.style.visibility = off ? "hidden" : "visible";
+      if (off) continue;
+      it.el.style.width = it.cw.toFixed(2) + "px";
+      it.el.style.height = it.ch.toFixed(2) + "px";
+      it.el.style.transform = `translate3d(${px.toFixed(2)}px,${(cy - it.ch / 2).toFixed(2)}px,0)`;
+      it.el.style.opacity = clamp(1 - (a - 2.2) * 0.2, 0.18, 1).toFixed(3);
+      it.el.style.zIndex = 1000 - Math.round(a * 10);
+      it.el.style.borderRadius = ((5 + 6 * it.w) * Math.max(S, .7)).toFixed(1) + "px";
+      it.el.classList.toggle("is-active", it.w > 0.6);
+      it.shade.style.opacity = it.w.toFixed(3);
+      it.cap.style.opacity = (it.w * it.w).toFixed(3);
+      if (it.badge) it.badge.style.opacity = (it.w * it.w).toFixed(3);
+    }
+  }
+
+  /* ---------- state: target / dots / videos ---------- */
+  function syncState() {
+    const act = mod(Math.round(target), N);
+    dots.forEach((d, i) => d.classList.toggle("on", i === act));
+    items.forEach(it => {
+      if (!it.vid) return;
+      if (it.j === act && !reduce) { const p = it.vid.play(); if (p && p.catch) p.catch(() => {}); }
+      else if (!it.vid.paused) it.vid.pause();
+    });
+  }
+  function frame() {
+    const diff = target - pos;
+    if (Math.abs(diff) < 0.0008) { pos = target; render(); raf = 0; return; }
+    pos += diff * EASE; render(); raf = requestAnimationFrame(frame);
+  }
+  function setTarget(t) { target = t; syncState(); if (!raf) raf = requestAnimationFrame(frame); }
+  const go = d => setTarget(Math.round(target) + d);
+
+  /* ---------- autoplay ---------- */
+  let timer = 0, hover = false;
+  function arm() {
+    clearInterval(timer);
+    if (CONFIG.autoplay > 0 && !reduce) timer = setInterval(() => { if (!hover && !down && !document.hidden) go(1); }, CONFIG.autoplay);
+  }
+  root.addEventListener("mouseenter", () => (hover = true));
+  root.addEventListener("mouseleave", () => (hover = false));
+
+  /* ---------- drag / swipe ---------- */
+  let down = false, moved = false, sx = 0, spos = 0, lastPos = 0, lastT = 0, vel = 0, suppressClick = false;
+  root.addEventListener("pointerdown", e => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    down = true; moved = false; sx = e.clientX; spos = pos; lastPos = pos; lastT = performance.now(); vel = 0;
+    if (raf) { cancelAnimationFrame(raf); raf = 0; }
+    target = pos;
+  });
+  root.addEventListener("pointermove", e => {
+    if (!down) return;
+    const dx = e.clientX - sx;
+    if (!moved && Math.abs(dx) > 6) { moved = true; root.classList.add("is-drag"); try { root.setPointerCapture(e.pointerId); } catch (_) {} }
+    if (!moved) return;
+    pos = spos - dx / (Wa * 0.45); target = pos;
+    const now = performance.now(), dt = now - lastT;
+    if (dt > 0) { vel = 0.8 * vel + 0.2 * ((pos - lastPos) / dt); lastPos = pos; lastT = now; }
+    render();
+  });
+  function endDrag() {
+    if (!down) return;
+    down = false; root.classList.remove("is-drag");
+    if (moved) { suppressClick = true; setTimeout(() => (suppressClick = false), 0); setTarget(Math.round(pos + clamp(vel * 220, -3, 3))); arm(); }
+    else { target = Math.round(pos); }
+  }
+  root.addEventListener("pointerup", endDrag);
+  root.addEventListener("pointercancel", endDrag);
+
+  /* ---------- wheel / keyboard ---------- */
+  let lastWheel = 0;
+  root.addEventListener("wheel", e => {
+    const horiz = Math.abs(e.deltaX) > Math.abs(e.deltaY);
+    if (!horiz && !CONFIG.wheelVertical) return;            // normal page scroll stays untouched
+    e.preventDefault();
+    const n = performance.now(); if (n - lastWheel < 380) return;
+    lastWheel = n; go((horiz ? e.deltaX : e.deltaY) > 0 ? 1 : -1); arm();
+  }, { passive: false });
+  root.addEventListener("keydown", e => {
+    if (e.key === "ArrowRight") { e.preventDefault(); go(1); arm(); }
+    if (e.key === "ArrowLeft")  { e.preventDefault(); go(-1); arm(); }
+  });
+
+  /* ---------- images: exact name first (jpg → png → jpeg → webp), then lower-case / Capitalised ---------- */
+  function candidates(name) {
+    if (/^(https?:)?\/\//i.test(name)) return [name];
+    if (/\.(jpe?g|png|webp|avif|gif)$/i.test(name)) return [CONFIG.folder + encodeURI(name)];
+    const names = [name, name.toLowerCase(), name.charAt(0).toUpperCase() + name.slice(1)].filter((n, i, a) => a.indexOf(n) === i);
+    const out = [];
+    names.forEach(n => CONFIG.exts.forEach(e => out.push(CONFIG.folder + encodeURI(n + "." + e))));
+    return out;
+  }
+  function loadImage(i, k, list) {
+    list = list || candidates(SLIDES[i].image);
+    if (k >= list.length) { console.warn("Aperture Reel: image not found →", SLIDES[i].image); return; }
+    const im = new Image();
+    im.onload = () => { items[i].img.src = list[k]; };
+    im.onerror = () => loadImage(i, k + 1, list);
+    im.src = list[k];
+  }
+  SLIDES.forEach((s, i) => { if (s.image) loadImage(i, 0); });
+
+  /* ---------- init ---------- */
+  if ("ResizeObserver" in window) new ResizeObserver(measure).observe(root);
+  window.addEventListener("resize", measure);
+  document.addEventListener("visibilitychange", () => (document.hidden ? items.forEach(it => it.vid && it.vid.pause()) : syncState()));
+  measure(); syncState(); arm();
+})();
+/* ═════════════ APERTURE REEL — JS END ═════════════ */
+</script>
+</body>
+</html>
